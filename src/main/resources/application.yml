@@ -1,0 +1,21 @@
+server:
+  port: 8080
+
+spring:
+  application:
+    name: finance-dashboard
+  datasource:
+    url: jdbc:mysql://localhost:3306/finance_db?useSSL=false&serverTimezone=UTC
+    username: root
+    password: 123456
+    driver-class-name: com.mysql.cj.jdbc.Driver
+
+
+mybatis:
+  mapper-locations: classpath:mapper/*.xml
+  configuration:
+    map-underscore-to-camel-case: true
+
+jwt:
+  secret: ${JWT_SECRET:financeDashboardJwtSecretKey2024ForTokenGenerationAndValidationThisIsASecureKeyWithEnoughLengthForHMACSHA256Algorithm}
+  expiration: 604800 # 7天，单位秒
