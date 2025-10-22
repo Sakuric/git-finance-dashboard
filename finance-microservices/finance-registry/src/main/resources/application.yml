@@ -1,0 +1,109 @@
+server:
+  port: 8761
+
+spring:
+  application:
+    name: finance-registry
+  
+  # 安全配置（生产环境建议启用）
+  security:
+    user:
+      name: admin
+      password: admin123
+
+eureka:
+  instance:
+    hostname: localhost
+    prefer-ip-address: true
+    lease-renewal-interval-in-seconds: 5
+    lease-expiration-duration-in-seconds: 15
+    metadata-map:
+      user.name: ${spring.security.user.name}
+      user.password: ${spring.security.user.password}
+  
+  server:
+    # 自我保护模式（生产环境建议开启）
+    enable-self-preservation: true
+    # 清理间隔（单位：毫秒）
+    eviction-interval-timer-in-ms: 5000
+    # 是否启用只读模式
+    readonly-registry-map-cache: true
+    # 响应缓存更新时间
+    response-cache-update-interval-ms: 30000
+    # 响应缓存自动过期时间
+    response-cache-auto-expiration-in-seconds: 180
+    # 注册表缓存过期时间
+    registry-sync-retries: 0
+    registry-sync-retry-wait-ms: 500
+    max-threads-for-status-replication: 1
+    max-threads-for-peer-replication: 20
+  
+  client:
+    # 是否将自己注册到Eureka Server
+    register-with-eureka: false
+    # 是否从Eureka Server获取注册信息
+    fetch-registry: false
+    service-url:
+      defaultZone: http://${spring.security.user.name}:${spring.security.user.password}@${eureka.instance.hostname}:${server.port}/eureka/
+    healthcheck:
+      enabled: true
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: "*"
+  endpoint:
+    health:
+      show-details: always
+  metrics:
+    export:
+      prometheus:
+        enabled: true
+
+logging:
+  level:
+    com.netflix.eureka: INFO
+    com.netflix.discovery: INFO
+    org.springframework.cloud.netflix.eureka: INFO
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"
+    file: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"
+  file:
+    name: logs/finance-registry.log
+    max-size: 100MB
+    max-history: 30
+
+---
+# 开发环境配置
+spring:
+  config:
+    activate:
+      on-profile: dev
+
+eureka:
+  server:
+    # 开发环境关闭自我保护模式
+    enable-self-preservation: false
+    # 开发环境缩短清理间隔
+    eviction-interval-timer-in-ms: 3000
+
+---
+# 生产环境配置
+spring:
+  config:
+    activate:
+      on-profile: prod
+
+eureka:
+  server:
+    # 生产环境开启自我保护模式
+    enable-self-preservation: true
+    # 生产环境延长清理间隔
+    eviction-interval-timer-in-ms: 15000
+
+logging:
+  level:
+    com.netflix.eureka: WARN
+    com.netflix.discovery: WARN
+    org.springframework.cloud.netflix.eureka: WARN
