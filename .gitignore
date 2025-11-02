@@ -70,14 +70,14 @@ Thumbs.db
 *.swp
 *~
 
-# Documents
-*.docx
-*.doc
-*.pdf
-*.xls
-*.xlsx
-*.ppt
-*.pptx
+# Documents (excluding important project documents)
+# *.docx
+# *.doc
+# *.pdf
+# *.xls
+# *.xlsx
+# *.ppt
+# *.pptx
 
 # Logs
 logs/
