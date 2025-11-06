@@ -71,8 +71,9 @@ Thumbs.db
 *~
 
 # Documents (excluding important project documents)
- *.docx
-# *.doc
+*.docx
+*.doc
+*.md
 # *.pdf
 # *.xls
 # *.xlsx
