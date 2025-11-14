@@ -86,3 +86,9 @@ logs/
 
 # Cache
 .cache/
+
+# uml
+*.mdj
+
+#pictures
+*.png
