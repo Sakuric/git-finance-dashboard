@@ -55,6 +55,11 @@ public class UserServiceImpl implements UserService {
             throw new RuntimeException("用户名或密码错误");
         }
         
+        // 检查用户状态
+        if (user.getStatus() != 1) {
+            throw new RuntimeException("账户已被禁用");
+        }
+        
         // 生成JWT令牌
         return jwtUtil.generateToken(user);
     }

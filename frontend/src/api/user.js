@@ -1,32 +1,53 @@
-// frontend/src/api/user.js
-import request from '@/utils/request'
+import request from './request'
 
-export function register(data) {
-    return request({
-        url: '/users/register',
-        method: 'post',
-        data
-    })
-}
-
+// 用户登录
 export function login(data) {
-    return request({
-        url: '/users/login',
-        method: 'post',
-        data
-    })
+  return request({
+    url: '/api/users/login',
+    method: 'post',
+    data
+  })
 }
 
+// 用户注册
+export function register(data) {
+  return request({
+    url: '/api/users/register',
+    method: 'post',
+    data
+  })
+}
+
+// 获取用户信息
 export function getUserInfo() {
-    return request({
-        url: '/users/info',
-        method: 'get'
-    })
+  return request({
+    url: '/api/users/info',
+    method: 'get'
+  })
 }
 
+// 更新用户信息
+export function updateUserInfo(data) {
+  return request({
+    url: '/api/users/update',
+    method: 'put',
+    data
+  })
+}
+
+// 修改密码
+export function changePassword(data) {
+  return request({
+    url: '/api/users/change-password',
+    method: 'post',
+    data
+  })
+}
+
+// 用户登出
 export function logout() {
-    return request({
-        url: '/users/logout',
-        method: 'post'
-    })
+  return request({
+    url: '/api/users/logout',
+    method: 'post'
+  })
 }

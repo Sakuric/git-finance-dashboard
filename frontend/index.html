@@ -1,0 +1,771 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>InvestIQ AI - Intelligent Investment Platform</title>
+    <link rel="stylesheet" href="style.css">
+    <!-- Font Awesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css">
+    <!-- ECharts Library -->
+    <script src="https://cdn.jsdelivr.net/npm/echarts@5.4.3/dist/echarts.min.js"></script>
+</head>
+<body>
+
+<div class="app-container">
+    <!-- ===== 左侧导航栏 (Sidebar) ===== -->
+    <aside class="sidebar">
+        <div class="logo">
+            <i class="fas fa-chart-pie"></i>
+            <h1>InvestIQ AI</h1>
+        </div>
+        <nav class="menu">
+            <a href="#dashboard" class="menu-item active" data-page="dashboard"><i class="fas fa-tachometer-alt"></i><span>仪表盘</span></a>
+            <a href="#market" class="menu-item" data-page="market"><i class="fas fa-water"></i><span>个股行情</span></a>
+            <a href="#watchlist" class="menu-item" data-page="watchlist"><i class="fas fa-star"></i><span>我的自选</span></a>
+            <a href="#advisor" class="menu-item" data-page="advisor"><i class="fas fa-robot"></i><span>智能投顾</span></a>
+            <a href="#ai-models" class="menu-item" data-page="ai-models"><i class="fas fa-brain"></i><span>AI模型管理</span></a>
+        </nav>
+        <div class="sidebar-footer">
+            <a href="#settings" class="menu-item" data-page="settings"><i class="fas fa-cog"></i><span>设置</span></a>
+            <a href="#" class="menu-item" id="logoutBtn"><i class="fas fa-sign-out-alt"></i><span>退出登录</span></a>
+        </div>
+    </aside>
+
+    <!-- ===== 主内容区 (Main Content) ===== -->
+    <main class="main-content">
+        <!-- 仪表盘页面 (未变动) -->
+        <div id="dashboard-page" class="page-content active">
+             <!-- 顶部 Header -->
+             <header class="header">
+                <div class="header-left">
+                    <h2>仪表盘</h2>
+                    <p>欢迎回来, Admin</p>
+                </div>
+                <div class="header-right">
+                    <div class="search-box">
+                        <input type="text" placeholder="搜索股票代码/名称...">
+                        <i class="fas fa-search"></i>
+                    </div>
+                    <div class="user-profile">
+                        <img src="https://i.pravatar.cc/40?u=admin" alt="User Avatar">
+                    </div>
+                </div>
+            </header>
+
+            <!-- 内容网格 -->
+            <div class="content-grid">
+                <!-- 主要市场指数 -->
+                <div class="card index-card">
+                    <div class="index-item">
+                        <p>上证指数</p>
+                        <h3 class="positive">3,145.80</h3>
+                        <span class="positive">+12.50 (+0.40%)</span>
+                    </div>
+                    <div class="index-item">
+                        <p>深证成指</p>
+                        <h3 class="negative">10,480.11</h3>
+                        <span class="negative">-25.30 (-0.24%)</span>
+                    </div>
+                    <div class="index-item">
+                        <p>恒生指数</p>
+                        <h3 class="positive">18,500.20</h3>
+                        <span class="positive">+210.70 (+1.15%)</span>
+                    </div>
+                </div>
+
+                <!-- 主图表卡片 -->
+                <div class="card chart-card-large">
+                    <div class="card-header">
+                        <h3>上证指数 K线图</h3>
+                        <div class="time-selector">
+                            <button class="active" data-period="daily">日K</button>
+                            <button data-period="weekly">周K</button>
+                            <button data-period="monthly">月K</button>
+                        </div>
+                    </div>
+                    <div id="mainKLineChart" class="chart-container"></div>
+                </div>
+
+                 <!-- 我的自选 -->
+                <div class="card watchlist-card">
+                    <div class="card-header">
+                        <h3>我的自选</h3>
+                        <a href="#" class="view-all">管理全部 <i class="fas fa-arrow-right"></i></a>
+                    </div>
+                    <ul class="watchlist">
+                        <li class="watchlist-item">
+                            <div class="stock-info">
+                                <span>贵州茅台</span><small>600519</small>
+                            </div>
+                            <div class="stock-price positive">
+                                <span>1850.00</span>
+                                <small>+1.50%</small>
+                            </div>
+                        </li>
+                        <li class="watchlist-item">
+                            <div class="stock-info">
+                                <span>宁德时代</span><small>300750</small>
+                            </div>
+                            <div class="stock-price negative">
+                                <span>218.50</span>
+                                <small>-2.10%</small>
+                            </div>
+                        </li>
+                         <li class="watchlist-item">
+                            <div class="stock-info">
+                                <span>比亚迪</span><small>002594</small>
+                            </div>
+                            <div class="stock-price positive">
+                                <span>255.88</span>
+                                <small>+0.88%</small>
+                            </div>
+                        </li>
+                    </ul>
+                </div>
+
+                <!-- AI 投资建议 -->
+                <div class="card advice-card">
+                     <div class="card-header">
+                        <h3>最新智能投顾建议</h3>
+                        <a href="#" class="view-all">查看详情 <i class="fas fa-arrow-right"></i></a>
+                    </div>
+                    <div class="advice-content">
+                        <i class="fas fa-robot"></i>
+                        <p>根据您的 "稳健增长型" 偏好和最新市场数据，建议关注 <b>新能源汽车</b> 板块。可考虑在价格回调时适度建仓 <b>比亚迪 (002594)</b>。</p>
+                        <small>由 "我的增长模型 V2" 生成 - 2023-10-27 10:30</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ===== 股票详情页面 (重大重构) ===== -->
+        <div id="market-page" class="page-content">
+            <header class="header">
+                 <div class="header-left">
+                    <h2>个股行情</h2>
+                    <p>比亚迪 (002594)</p>
+                </div>
+                <!-- 此处搜索框可用于快速切换股票 -->
+            </header>
+          
+            <div class="card stock-detail-container">
+                <!-- 左侧：图表区域 -->
+                <div class="chart-section">
+                    <!-- 顶部核心信息区 -->
+                    <div class="stock-overview-pro">
+                        <div class="main-price-info">
+                            <span class="exchange-tag">深</span>
+                            <h1>比亚迪</h1>
+                            <span class="stock-code-pro">002594</span>
+                            <div class="current-price positive">
+                                <span class="price">255.88</span>
+                                <span class="change">+2.23</span>
+                                <span class="change-percent">+0.88%</span>
+                            </div>
+                        </div>
+                        <div class="key-metrics-grid">
+                            <div class="metric-item"><span class="label">高</span><span class="value positive">258.50</span></div>
+                            <div class="metric-item"><span class="label">低</span><span class="value negative">252.30</span></div>
+                            <div class="metric-item"><span class="label">开</span><span class="value positive">253.00</span></div>
+                            <div class="metric-item"><span class="label">昨收</span><span class="value">253.65</span></div>
+                            <div class="metric-item"><span class="label">量</span><span class="value">15.2万手</span></div>
+                            <div class="metric-item"><span class="label">额</span><span class="value">3.9亿</span></div>
+                            <div class="metric-item"><span class="label">换手</span><span class="value">1.58%</span></div>
+                            <div class="metric-item"><span class="label">市盈</span><span class="value">25.1</span></div>
+                            <div class="metric-item"><span class="label">总市值</span><span class="value">7450亿</span></div>
+                            <div class="metric-item"><span class="label">流通值</span><span class="value">4980亿</span></div>
+                        </div>
+                    </div>
+                    <!-- 图表区域 -->
+                    <div class="chart-tabs-pro">
+                        <div class="tabs-header-pro">
+                             <button class="tab-button-pro active" data-tab="timeline">分时</button>
+                             <button class="tab-button-pro" data-tab="kline">日K</button>
+                             <button class="tab-button-pro" data-tab="kline-week">周K</button>
+                             <button class="tab-button-pro" data-tab="kline-month">月K</button>
+                        </div>
+                        <div class="tab-content-pro active" id="timeline-tab-content">
+                            <div id="stockTimelineChart" class="main-chart-container"></div>
+                        </div>
+                        <div class="tab-content-pro" id="kline-tab-content">
+                            <div id="stockKLineChart" class="main-chart-container"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 右侧：数据区域 -->
+                <div class="data-section">
+                    <!-- 五档盘口 -->
+                    <div class="order-book-card">
+                        <ul class="order-list" id="sell-orders">
+                            <!-- JS动态生成 -->
+                        </ul>
+                        <div class="current-price-divider">255.88</div>
+                        <ul class="order-list" id="buy-orders">
+                            <!-- JS动态生成 -->
+                        </ul>
+                    </div>
+                    <!-- 分时成交 -->
+                    <div class="tick-data-card">
+                        <div class="tick-header">
+                            <span>时间</span>
+                            <span>价格</span>
+                            <span>成交量(手)</span>
+                        </div>
+                        <ul class="tick-list" id="tick-list-container">
+                           <!-- JS动态生成 -->
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 我的自选页面 -->
+        <div id="watchlist-page" class="page-content">
+            <header class="header">
+                <div class="header-left">
+                    <h2>我的自选</h2>
+                    <p>管理您关注的股票</p>
+                </div>
+                <div class="header-right">
+                    <div class="search-box">
+                        <input type="text" placeholder="搜索股票代码/名称...">
+                        <i class="fas fa-search"></i>
+                    </div>
+                    <button class="auth-btn" style="width: auto; padding: 0.6rem 1.2rem;">
+                        <span class="btn-text">添加股票</span>
+                    </button>
+                </div>
+            </header>
+
+            <div class="content-grid">
+                <div class="card" style="grid-column: 1 / -1;">
+                    <div class="card-header">
+                        <h3>自选股票列表</h3>
+                        <div class="view-options">
+                            <button class="active">列表</button>
+                            <button>卡片</button>
+                        </div>
+                    </div>
+                    <div class="watchlist-table-container">
+                        <table class="watchlist-table">
+                            <thead>
+                                <tr>
+                                    <th>股票代码</th>
+                                    <th>股票名称</th>
+                                    <th>当前价</th>
+                                    <th>涨跌幅</th>
+                                    <th>成交量</th>
+                                    <th>操作</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td>600519</td>
+                                    <td>贵州茅台</td>
+                                    <td>1850.00</td>
+                                    <td class="positive">+1.50%</td>
+                                    <td>2.3万</td>
+                                    <td>
+                                        <button class="icon-btn"><i class="fas fa-chart-line"></i></button>
+                                        <button class="icon-btn"><i class="fas fa-trash"></i></button>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td>300750</td>
+                                    <td>宁德时代</td>
+                                    <td>218.50</td>
+                                    <td class="negative">-2.10%</td>
+                                    <td>5.8万</td>
+                                    <td>
+                                        <button class="icon-btn"><i class="fas fa-chart-line"></i></button>
+                                        <button class="icon-btn"><i class="fas fa-trash"></i></button>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td>002594</td>
+                                    <td>比亚迪</td>
+                                    <td>255.88</td>
+                                    <td class="positive">+0.88%</td>
+                                    <td>15.2万</td>
+                                    <td>
+                                        <button class="icon-btn"><i class="fas fa-chart-line"></i></button>
+                                        <button class="icon-btn"><i class="fas fa-trash"></i></button>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td>000858</td>
+                                    <td>五粮液</td>
+                                    <td>168.50</td>
+                                    <td class="positive">+0.65%</td>
+                                    <td>3.2万</td>
+                                    <td>
+                                        <button class="icon-btn"><i class="fas fa-chart-line"></i></button>
+                                        <button class="icon-btn"><i class="fas fa-trash"></i></button>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td>600036</td>
+                                    <td>招商银行</td>
+                                    <td>42.30</td>
+                                    <td class="negative">-0.35%</td>
+                                    <td>8.7万</td>
+                                    <td>
+                                        <button class="icon-btn"><i class="fas fa-chart-line"></i></button>
+                                        <button class="icon-btn"><i class="fas fa-trash"></i></button>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                
+                <div class="card">
+                    <div class="card-header">
+                        <h3>自选股行业分布</h3>
+                    </div>
+                    <div class="chart-container" id="watchlistSectorChart" style="height: 300px;"></div>
+                </div>
+                
+                <div class="card">
+                    <div class="card-header">
+                        <h3>自选股涨跌分布</h3>
+                    </div>
+                    <div class="chart-container" id="watchlistPerformanceChart" style="height: 300px;"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 智能投顾页面 -->
+        <div id="advisor-page" class="page-content">
+            <header class="header">
+                <div class="header-left">
+                    <h2>智能投顾</h2>
+                    <p>AI驱动的个性化投资建议</p>
+                </div>
+                <div class="header-right">
+                    <div class="search-box">
+                        <input type="text" placeholder="搜索投顾建议...">
+                        <i class="fas fa-search"></i>
+                    </div>
+                </div>
+            </header>
+
+            <div class="content-grid">
+                <div class="card" style="grid-column: 1 / -1;">
+                    <div class="card-header">
+                        <h3>投资偏好设置</h3>
+                    </div>
+                    <div class="preference-settings">
+                        <div class="preference-group">
+                            <h4>风险承受能力</h4>
+                            <div class="preference-options">
+                                <label class="radio-option">
+                                    <input type="radio" name="risk" value="conservative">
+                                    <span class="radio-check"></span>
+                                    <span class="radio-label">保守型</span>
+                                </label>
+                                <label class="radio-option">
+                                    <input type="radio" name="risk" value="balanced" checked>
+                                    <span class="radio-check"></span>
+                                    <span class="radio-label">稳健型</span>
+                                </label>
+                                <label class="radio-option">
+                                    <input type="radio" name="risk" value="aggressive">
+                                    <span class="radio-check"></span>
+                                    <span class="radio-label">激进型</span>
+                                </label>
+                            </div>
+                        </div>
+                        <div class="preference-group">
+                            <h4>投资期限</h4>
+                            <div class="preference-options">
+                                <label class="radio-option">
+                                    <input type="radio" name="term" value="short">
+                                    <span class="radio-check"></span>
+                                    <span class="radio-label">短期 (3个月内)</span>
+                                </label>
+                                <label class="radio-option">
+                                    <input type="radio" name="term" value="medium" checked>
+                                    <span class="radio-check"></span>
+                                    <span class="radio-label">中期 (3-12个月)</span>
+                                </label>
+                                <label class="radio-option">
+                                    <input type="radio" name="term" value="long">
+                                    <span class="radio-check"></span>
+                                    <span class="radio-label">长期 (1年以上)</span>
+                                </label>
+                            </div>
+                        </div>
+                        <div class="preference-group">
+                            <h4>关注行业</h4>
+                            <div class="preference-options">
+                                <label class="checkbox-option">
+                                    <input type="checkbox" value="tech" checked>
+                                    <span class="checkbox-check"></span>
+                                    <span class="checkbox-label">科技</span>
+                                </label>
+                                <label class="checkbox-option">
+                                    <input type="checkbox" value="finance" checked>
+                                    <span class="checkbox-check"></span>
+                                    <span class="checkbox-label">金融</span>
+                                </label>
+                                <label class="checkbox-option">
+                                    <input type="checkbox" value="healthcare">
+                                    <span class="checkbox-check"></span>
+                                    <span class="checkbox-label">医疗</span>
+                                </label>
+                                <label class="checkbox-option">
+                                    <input type="checkbox" value="consumer" checked>
+                                    <span class="checkbox-check"></span>
+                                    <span class="checkbox-label">消费</span>
+                                </label>
+                                <label class="checkbox-option">
+                                    <input type="checkbox" value="energy">
+                                    <span class="checkbox-check"></span>
+                                    <span class="checkbox-label">能源</span>
+                                </label>
+                            </div>
+                        </div>
+                        <button class="auth-btn" style="margin-top: 1rem; align-self: flex-start;">
+                            <span class="btn-text">保存偏好设置</span>
+                        </button>
+                    </div>
+                </div>
+
+                <div class="card advice-card-large" style="grid-column: 1 / -1;">
+                    <div class="card-header">
+                        <h3>最新智能投顾建议</h3>
+                        <div class="filter-tabs">
+                            <button class="active">全部</button>
+                            <button>买入建议</button>
+                            <button>卖出建议</button>
+                            <button>持仓分析</button>
+                        </div>
+                    </div>
+                    <div class="advice-list">
+                        <div class="advice-item">
+                            <div class="advice-header">
+                                <div class="advice-type buy">买入建议</div>
+                                <div class="advice-time">2023-10-27 10:30</div>
+                            </div>
+                            <div class="advice-content">
+                                <div class="advice-stock">
+                                    <div class="stock-icon">BYD</div>
+                                    <div class="stock-info">
+                                        <div class="stock-name">比亚迪 (002594)</div>
+                                        <div class="stock-price">255.88 <span class="positive">+0.88%</span></div>
+                                    </div>
+                                </div>
+                                <div class="advice-details">
+                                    <p>根据您的 "稳健增长型" 偏好和最新市场数据，建议关注新能源汽车板块。比亚迪作为行业龙头，近期技术指标显示买入信号，建议在价格回调至252元附近时适度建仓。</p>
+                                    <div class="advice-model">
+                                        <i class="fas fa-robot"></i> 由 "我的增长模型 V2" 生成
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="advice-actions">
+                                <button class="btn-primary" style="padding: 0.5rem 1rem; font-size: 0.85rem;">查看详情</button>
+                                <button class="btn-secondary" style="padding: 0.5rem 1rem; font-size: 0.85rem;">忽略建议</button>
+                            </div>
+                        </div>
+                        
+                        <div class="advice-item">
+                            <div class="advice-header">
+                                <div class="advice-type sell">卖出建议</div>
+                                <div class="advice-time">2023-10-27 09:15</div>
+                            </div>
+                            <div class="advice-content">
+                                <div class="advice-stock">
+                                    <div class="stock-icon">300750</div>
+                                    <div class="stock-info">
+                                        <div class="stock-name">宁德时代 (300750)</div>
+                                        <div class="stock-price">218.50 <span class="negative">-2.10%</span></div>
+                                    </div>
+                                </div>
+                                <div class="advice-details">
+                                    <p>宁德时代近期技术指标显示卖出信号，RSI指标进入超买区域。建议部分减仓，锁定利润，等待更好的入场时机。</p>
+                                    <div class="advice-model">
+                                        <i class="fas fa-robot"></i> 由 "技术分析模型 V1" 生成
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="advice-actions">
+                                <button class="btn-primary" style="padding: 0.5rem 1rem; font-size: 0.85rem;">查看详情</button>
+                                <button class="btn-secondary" style="padding: 0.5rem 1rem; font-size: 0.85rem;">忽略建议</button>
+                            </div>
+                        </div>
+                        
+                        <div class="advice-item">
+                            <div class="advice-header">
+                                <div class="advice-type analysis">持仓分析</div>
+                                <div class="advice-time">2023-10-26 16:00</div>
+                            </div>
+                            <div class="advice-content">
+                                <div class="advice-stock">
+                                    <div class="stock-icon">600519</div>
+                                    <div class="stock-info">
+                                        <div class="stock-name">贵州茅台 (600519)</div>
+                                        <div class="stock-price">1850.00 <span class="positive">+1.50%</span></div>
+                                    </div>
+                                </div>
+                                <div class="advice-details">
+                                    <p>您的贵州茅台持仓表现良好，近期走势强于大盘。根据基本面分析，公司业绩稳定增长，建议继续持有，可考虑在季度报告发布后适当加仓。</p>
+                                    <div class="advice-model">
+                                        <i class="fas fa-robot"></i> 由 "持仓分析模型 V3" 生成
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="advice-actions">
+                                <button class="btn-primary" style="padding: 0.5rem 1rem; font-size: 0.85rem;">查看详情</button>
+                                <button class="btn-secondary" style="padding: 0.5rem 1rem; font-size: 0.85rem;">忽略建议</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="card">
+                    <div class="card-header">
+                        <h3>投资组合分析</h3>
+                    </div>
+                    <div class="chart-container" id="portfolioAnalysisChart" style="height: 300px;"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- AI模型管理页面 -->
+        <div id="ai-models-page" class="page-content">
+            <header class="header">
+                <div class="header-left">
+                    <h2>AI模型管理</h2>
+                    <p>管理和配置您的AI投资模型</p>
+                </div>
+                <div class="header-right">
+                    <button class="auth-btn" style="width: auto; padding: 0.6rem 1.2rem;">
+                        <span class="btn-text">创建新模型</span>
+                    </button>
+                </div>
+            </header>
+
+            <div class="content-grid">
+                <div class="card" style="grid-column: 1 / -1;">
+                    <div class="card-header">
+                        <h3>我的AI模型</h3>
+                        <div class="view-options">
+                            <button class="active">卡片视图</button>
+                            <button>列表视图</button>
+                        </div>
+                    </div>
+                    <div class="models-grid">
+                        <div class="model-card active">
+                            <div class="model-header">
+                                <div class="model-name">增长模型 V2</div>
+                                <div class="model-status active">运行中</div>
+                            </div>
+                            <div class="model-icon">
+                                <i class="fas fa-chart-line"></i>
+                            </div>
+                            <div class="model-details">
+                                <div class="model-type">趋势预测</div>
+                                <div class="model-description">基于历史数据和市场情绪分析，预测股票短期到中期价格趋势</div>
+                                <div class="model-stats">
+                                    <div class="stat-item">
+                                        <div class="stat-label">准确率</div>
+                                        <div class="stat-value">78.5%</div>
+                                    </div>
+                                    <div class="stat-item">
+                                        <div class="stat-label">更新频率</div>
+                                        <div class="stat-value">每日</div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="model-actions">
+                                <button class="icon-btn"><i class="fas fa-cog"></i></button>
+                                <button class="icon-btn"><i class="fas fa-chart-bar"></i></button>
+                                <button class="icon-btn"><i class="fas fa-pause"></i></button>
+                            </div>
+                        </div>
+                        
+                        <div class="model-card active">
+                            <div class="model-header">
+                                <div class="model-name">技术分析模型 V1</div>
+                                <div class="model-status active">运行中</div>
+                            </div>
+                            <div class="model-icon">
+                                <i class="fas fa-chart-area"></i>
+                            </div>
+                            <div class="model-details">
+                                <div class="model-type">技术指标</div>
+                                <div class="model-description">使用多种技术指标(RSI, MACD, KDJ等)生成买卖信号</div>
+                                <div class="model-stats">
+                                    <div class="stat-item">
+                                        <div class="stat-label">准确率</div>
+                                        <div class="stat-value">72.3%</div>
+                                    </div>
+                                    <div class="stat-item">
+                                        <div class="stat-label">更新频率</div>
+                                        <div class="stat-value">实时</div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="model-actions">
+                                <button class="icon-btn"><i class="fas fa-cog"></i></button>
+                                <button class="icon-btn"><i class="fas fa-chart-bar"></i></button>
+                                <button class="icon-btn"><i class="fas fa-pause"></i></button>
+                            </div>
+                        </div>
+                        
+                        <div class="model-card active">
+                            <div class="model-header">
+                                <div class="model-name">持仓分析模型 V3</div>
+                                <div class="model-status active">运行中</div>
+                            </div>
+                            <div class="model-icon">
+                                <i class="fas fa-briefcase"></i>
+                            </div>
+                            <div class="model-details">
+                                <div class="model-type">持仓优化</div>
+                                <div class="model-description">分析当前持仓表现，提供优化建议和风险评估</div>
+                                <div class="model-stats">
+                                    <div class="stat-item">
+                                        <div class="stat-label">准确率</div>
+                                        <div class="stat-value">81.2%</div>
+                                    </div>
+                                    <div class="stat-item">
+                                        <div class="stat-label">更新频率</div>
+                                        <div class="stat-value">每周</div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="model-actions">
+                                <button class="icon-btn"><i class="fas fa-cog"></i></button>
+                                <button class="icon-btn"><i class="fas fa-chart-bar"></i></button>
+                                <button class="icon-btn"><i class="fas fa-pause"></i></button>
+                            </div>
+                        </div>
+                        
+                        <div class="model-card">
+                            <div class="model-header">
+                                <div class="model-name">情绪分析模型</div>
+                                <div class="model-status inactive">已暂停</div>
+                            </div>
+                            <div class="model-icon">
+                                <i class="fas fa-comments"></i>
+                            </div>
+                            <div class="model-details">
+                                <div class="model-type">情绪分析</div>
+                                <div class="model-description">分析新闻和社交媒体情绪，预测市场短期波动</div>
+                                <div class="model-stats">
+                                    <div class="stat-item">
+                                        <div class="stat-label">准确率</div>
+                                        <div class="stat-value">65.8%</div>
+                                    </div>
+                                    <div class="stat-item">
+                                        <div class="stat-label">更新频率</div>
+                                        <div class="stat-value">每小时</div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="model-actions">
+                                <button class="icon-btn"><i class="fas fa-cog"></i></button>
+                                <button class="icon-btn"><i class="fas fa-chart-bar"></i></button>
+                                <button class="icon-btn"><i class="fas fa-play"></i></button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="card">
+                    <div class="card-header">
+                        <h3>模型性能对比</h3>
+                    </div>
+                    <div class="chart-container" id="modelPerformanceChart" style="height: 300px;"></div>
+                </div>
+                
+                <div class="card">
+                    <div class="card-header">
+                        <h3>模型使用统计</h3>
+                    </div>
+                    <div class="chart-container" id="modelUsageChart" style="height: 300px;"></div>
+                </div>
+            </div>
+        </div>
+        <div id="settings-page" class="page-content">
+            <header class="header">
+                <div class="header-left">
+                    <h2>设置</h2>
+                    <p>账户和系统设置</p>
+                </div>
+            </header>
+          
+            <div class="content-grid">
+                <div class="card">
+                    <div class="card-header">
+                        <h3>账户信息</h3>
+                    </div>
+                    <div class="settings-section">
+                        <div class="setting-item">
+                            <label>邮箱地址</label>
+                            <input type="email" id="userEmailDisplay" readonly>
+                        </div>
+                        <div class="setting-item">
+                            <label>登录时间</label>
+                            <span id="loginTime">--</span>
+                        </div>
+                    </div>
+                </div>
+              
+                <div class="card">
+                    <div class="card-header">
+                        <h3>系统设置</h3>
+                    </div>
+                    <div class="settings-section">
+                        <div class="setting-item">
+                            <label>主题模式</label>
+                            <select>
+                                <option>深色模式</option>
+                                <option>浅色模式</option>
+                                <option>跟随系统</option>
+                            </select>
+                        </div>
+                        <div class="setting-item">
+                            <label>语言</label>
+                            <select>
+                                <option>简体中文</option>
+                                <option>English</option>
+                            </select>
+                        </div>
+                        <div class="setting-item">
+                            <label>自动刷新数据</label>
+                            <label class="switch">
+                                <input type="checkbox" checked>
+                                <span class="slider"></span>
+                            </label>
+                        </div>
+                    </div>
+                </div>
+              
+                <div class="card">
+                    <div class="card-header">
+                        <h3>关于</h3>
+                    </div>
+                    <div class="settings-section">
+                        <div class="setting-item">
+                            <label>版本</label>
+                            <span>v1.0.0</span>
+                        </div>
+                        <div class="setting-item">
+                            <label>最后更新</label>
+                            <span>2023-10-27</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+</div>
+<!-- 引入script.js -->
+<script type="module" src="script.js"></script>
+</body>
+</html>

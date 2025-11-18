@@ -1,15 +1,16 @@
-// frontend/src/main.js
 import { createApp } from 'vue'
-import ElementPlus from 'element-plus'
-import 'element-plus/dist/index.css'
-import App from './App.vue'
+import { createPinia } from 'pinia'
 import router from './router'
-import store from './store'
+import App from './App.vue'
 
+// 创建Vue应用实例
 const app = createApp(App)
 
-app.use(ElementPlus)
-app.use(router)
-app.use(store)
+// 使用Pinia状态管理
+app.use(createPinia())
 
+// 使用Vue Router
+app.use(router)
+
+// 挂载应用
 app.mount('#app')
