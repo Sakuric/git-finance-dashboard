@@ -476,50 +476,53 @@ body { font-family: var(--font-family); background-color: var(--bg-color); color
 }
 
 .input-group {
-    position: relative;
     display: flex;
     align-items: center;
-}
-
-.input-group i {
-    position: absolute;
-    left: 1rem;
-    color: var(--text-secondary);
-    z-index: 1;
-    transition: color 0.3s ease;
-}
-
-.input-group input {
-    width: 100%;
-    padding: 0.875rem 1rem 0.875rem 3rem;
     background-color: rgba(13, 17, 23, 0.8);
     border: 1px solid rgba(48, 54, 61, 0.8);
     border-radius: 12px;
-    color: var(--text-primary);
-    font-size: 1rem;
     transition: all 0.3s ease;
 }
 
-.input-group input:focus {
-    outline: none;
+.input-group:focus-within {
     border-color: var(--primary-accent);
     box-shadow: 0 0 0 4px rgba(0, 175, 255, 0.15);
     background-color: rgba(13, 17, 23, 0.9);
 }
 
-.input-group input:focus + i {
+.input-group:focus-within > i,
+.input-group:focus-within .toggle-password {
     color: var(--primary-accent);
 }
 
+/* This targets the left icon (lock, user) */
+.input-group > i {
+    padding-left: 1rem;
+    padding-right: 0.75rem;
+    color: var(--text-secondary);
+    transition: color 0.3s ease;
+}
+
+.input-group input {
+    flex: 1;
+    width: 100%;
+    padding: 0.875rem 0.5rem;
+    background-color: transparent;
+    border: none;
+    color: var(--text-primary);
+    font-size: 1rem;
+}
+
+.input-group input:focus {
+    outline: none;
+}
+
 .toggle-password {
-    position: absolute;
-    right: 1rem;
     background: none;
     border: none;
     color: var(--text-secondary);
     cursor: pointer;
-    padding: 0.25rem;
-    border-radius: 4px;
+    padding: 0.875rem 1rem;
     transition: color 0.2s;
 }
 

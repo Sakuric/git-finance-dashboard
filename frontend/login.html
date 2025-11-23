@@ -47,7 +47,7 @@
                         <div class="input-group">
                             <i class="fas fa-lock"></i>
                             <input type="password" id="login-password" name="password" placeholder="请输入您的密码" autocomplete="current-password" required>
-                            <button type="button" class="toggle-password" onclick="togglePasswordVisibility('login-password')" title="显示/隐藏密码">
+                            <button type="button" class="toggle-password" title="显示/隐藏密码">
                                 <i class="fas fa-eye"></i>
                             </button>
                         </div>
@@ -105,7 +105,7 @@
                         <div class="input-group">
                             <i class="fas fa-lock"></i>
                             <input type="password" id="register-password" name="password" placeholder="请输入密码（至少8位）" autocomplete="new-password" required>
-                            <button type="button" class="toggle-password" onclick="togglePasswordVisibility('register-password')" title="显示/隐藏密码">
+                            <button type="button" class="toggle-password" title="显示/隐藏密码">
                                 <i class="fas fa-eye"></i>
                             </button>
                         </div>
@@ -117,7 +117,7 @@
                         <div class="input-group">
                             <i class="fas fa-lock"></i>
                             <input type="password" id="register-confirm-password" name="confirmPassword" placeholder="请再次输入密码" autocomplete="new-password" required>
-                            <button type="button" class="toggle-password" onclick="togglePasswordVisibility('register-confirm-password')" title="显示/隐藏密码">
+                            <button type="button" class="toggle-password" title="显示/隐藏密码">
                                 <i class="fas fa-eye"></i>
                             </button>
                         </div>
@@ -173,20 +173,6 @@
             clearAllErrors();
         }
       
-        function togglePasswordVisibility(inputId) {
-            const input = document.getElementById(inputId);
-            const icon = event.target.querySelector('i') || event.target;
-          
-            if (input.type === 'password') {
-                input.type = 'text';
-                icon.classList.remove('fa-eye');
-                icon.classList.add('fa-eye-slash');
-            } else {
-                input.type = 'password';
-                icon.classList.remove('fa-eye-slash');
-                icon.classList.add('fa-eye');
-            }
-        }
       
         function handleForgotPassword() {
             const modal = document.createElement('div');
