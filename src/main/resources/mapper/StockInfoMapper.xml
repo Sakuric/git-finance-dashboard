@@ -6,51 +6,71 @@
     <resultMap id="BaseResultMap" type="com.example.financedashboard.entity.StockInfo">
         <id column="id" property="id" />
         <result column="stock_code" property="stockCode" />
+        <result column="stock_symbol" property="stockSymbol" />
         <result column="stock_name" property="stockName" />
         <result column="exchange" property="exchange" />
         <result column="industry" property="industry" />
+        <result column="sector" property="sector" />
+        <result column="listing_date" property="listingDate" />
         <result column="current_price" property="currentPrice" />
-        <result column="open_price" property="openPrice" />
-        <result column="high_price" property="highPrice" />
-        <result column="low_price" property="lowPrice" />
-        <result column="pre_close" property="preClose" />
-        <result column="volume" property="volume" />
-        <result column="amount" property="amount" />
-        <result column="update_time" property="updateTime" />
+        <result column="yesterday_close" property="yesterdayClose" />
+        <result column="change_percent" property="changePercent" />
+        <result column="market_value" property="marketValue" />
+        <result column="status" property="status" />
+        <result column="last_update_time" property="lastUpdateTime" />
+        <result column="created_at" property="createdAt" />
+        <result column="updated_at" property="updatedAt" />
     </resultMap>
 
     <select id="findAll" resultMap="BaseResultMap">
-        SELECT * FROM t_stock_info ORDER BY id ASC
+        SELECT * FROM stock_info ORDER BY id ASC
     </select>
 
     <select id="findByStockCode" resultMap="BaseResultMap">
-        SELECT * FROM t_stock_info WHERE stock_code = #{stockCode}
+        SELECT * FROM stock_info WHERE stock_code = #{stockCode}
     </select>
 
     <insert id="insert" parameterType="com.example.financedashboard.entity.StockInfo" useGeneratedKeys="true" keyProperty="id">
-        INSERT INTO t_stock_info (stock_code, stock_name, exchange, industry, current_price, open_price, high_price, low_price, pre_close, volume, amount, update_time)
-        VALUES (#{stockCode}, #{stockName}, #{exchange}, #{industry}, #{currentPrice}, #{openPrice}, #{highPrice}, #{lowPrice}, #{preClose}, #{volume}, #{amount}, #{updateTime})
+        INSERT INTO stock_info (stock_code, stock_symbol, stock_name, exchange, industry, sector,
+                                listing_date, current_price, yesterday_close, change_percent,
+                                market_value, status, last_update_time, created_at, updated_at)
+        VALUES (#{stockCode}, #{stockSymbol}, #{stockName}, #{exchange}, #{industry}, #{sector},
+                #{listingDate}, #{currentPrice}, #{yesterdayClose}, #{changePercent},
+                #{marketValue}, #{status}, #{lastUpdateTime}, #{createdAt}, #{updatedAt})
     </insert>
 
     <insert id="batchInsert" parameterType="java.util.List">
-        INSERT INTO t_stock_info (stock_code, stock_name, exchange, industry, current_price, open_price, high_price, low_price, pre_close, volume, amount, update_time)
+        INSERT INTO stock_info (stock_code, stock_symbol, stock_name, exchange, industry, sector,
+                                listing_date, current_price, yesterday_close, change_percent,
+                                market_value, status, last_update_time, created_at, updated_at)
         VALUES
         <foreach collection="stockInfos" item="stock" separator=",">
-            (#{stock.stockCode}, #{stock.stockName}, #{stock.exchange}, #{stock.industry}, #{stock.currentPrice},
-            #{stock.openPrice}, #{stock.highPrice}, #{stock.lowPrice}, #{stock.preClose}, #{stock.volume}, #{stock.amount}, #{stock.updateTime})
+            (#{stock.stockCode}, #{stock.stockSymbol}, #{stock.stockName}, #{stock.exchange},
+             #{stock.industry}, #{stock.sector}, #{stock.listingDate}, #{stock.currentPrice},
+             #{stock.yesterdayClose}, #{stock.changePercent}, #{stock.marketValue}, #{stock.status},
+             #{stock.lastUpdateTime}, #{stock.createdAt}, #{stock.updatedAt})
         </foreach>
     </insert>
 
     <update id="update" parameterType="com.example.financedashboard.entity.StockInfo">
-        UPDATE t_stock_info
-        SET stock_name = #{stockName}, exchange = #{exchange}, industry = #{industry},
-            current_price = #{currentPrice}, open_price = #{openPrice}, high_price = #{highPrice},
-            low_price = #{lowPrice}, pre_close = #{preClose}, volume = #{volume},
-            amount = #{amount}, update_time = #{updateTime}
+        UPDATE stock_info
+        SET stock_symbol = #{stockSymbol},
+            stock_name = #{stockName},
+            exchange = #{exchange},
+            industry = #{industry},
+            sector = #{sector},
+            listing_date = #{listingDate},
+            current_price = #{currentPrice},
+            yesterday_close = #{yesterdayClose},
+            change_percent = #{changePercent},
+            market_value = #{marketValue},
+            status = #{status},
+            last_update_time = #{lastUpdateTime},
+            updated_at = #{updatedAt}
         WHERE stock_code = #{stockCode}
     </update>
 
     <delete id="deleteByStockCode">
-        DELETE FROM t_stock_info WHERE stock_code = #{stockCode}
+        DELETE FROM stock_info WHERE stock_code = #{stockCode}
     </delete>
 </mapper>

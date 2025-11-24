@@ -8,15 +8,16 @@
         <result column="username" property="username" />
         <result column="password" property="password" />
         <result column="email" property="email" />
-        <result column="phone" property="phone" />
+        <result column="phone_number" property="phoneNumber" />
+        <result column="avatar_url" property="avatarUrl" />
         <result column="status" property="status" />
-        <result column="create_time" property="createTime" />
-        <result column="update_time" property="updateTime" />
+        <result column="created_at" property="createdAt" />
+        <result column="updated_at" property="updatedAt" />
     </resultMap>
 
     <insert id="insert" parameterType="com.example.financedashboard.entity.User" useGeneratedKeys="true" keyProperty="id">
-        INSERT INTO user_info (username, password, email, phone, status, create_time, update_time)
-        VALUES (#{username}, #{password}, #{email}, #{phone}, #{status}, #{createTime}, #{updateTime})
+        INSERT INTO user_info (username, password, email, phone_number, avatar_url, status, created_at, updated_at)
+        VALUES (#{username}, #{password}, #{email}, #{phoneNumber}, #{avatarUrl}, #{status}, #{createdAt}, #{updatedAt})
     </insert>
 
     <select id="findByUsername" resultMap="BaseResultMap">
@@ -33,7 +34,13 @@
 
     <update id="update" parameterType="com.example.financedashboard.entity.User">
         UPDATE user_info
-        SET username = #{username}, password = #{password}, email = #{email}, phone = #{phone}, status = #{status}, update_time = #{updateTime}
+        SET username = #{username},
+            password = #{password},
+            email = #{email},
+            phone_number = #{phoneNumber},
+            avatar_url = #{avatarUrl},
+            status = #{status},
+            updated_at = #{updatedAt}
         WHERE id = #{id}
     </update>
 </mapper>

@@ -28,7 +28,10 @@ public class StockServiceImpl implements StockService {
 
     @Override
     public boolean addStock(StockInfo stockInfo) {
-        stockInfo.setUpdateTime(LocalDateTime.now());
+        LocalDateTime now = LocalDateTime.now();
+        stockInfo.setLastUpdateTime(now);
+        stockInfo.setCreatedAt(now);
+        stockInfo.setUpdatedAt(now);
         return stockInfoMapper.insert(stockInfo) > 0;
     }
 
@@ -45,7 +48,9 @@ public class StockServiceImpl implements StockService {
         List<String> existingCodes = new java.util.ArrayList<>();
         
         for (StockInfo stock : stockInfos) {
-            stock.setUpdateTime(now);
+            stock.setLastUpdateTime(now);
+            stock.setCreatedAt(now);
+            stock.setUpdatedAt(now);
             
             // 检查数据库中是否已存在
             StockInfo existingStock = stockInfoMapper.findByStockCode(stock.getStockCode());
@@ -80,7 +85,9 @@ public class StockServiceImpl implements StockService {
 
     @Override
     public boolean updateStock(StockInfo stockInfo) {
-        stockInfo.setUpdateTime(LocalDateTime.now());
+        LocalDateTime now = LocalDateTime.now();
+        stockInfo.setLastUpdateTime(now);
+        stockInfo.setUpdatedAt(now);
         return stockInfoMapper.update(stockInfo) > 0;
     }
 
@@ -120,7 +127,8 @@ public class StockServiceImpl implements StockService {
         int totalCount = stockInfos.size();
         
         for (StockInfo stock : stockInfos) {
-            stock.setUpdateTime(now);
+            stock.setLastUpdateTime(now);
+            stock.setUpdatedAt(now);
             
             try {
                 // 检查股票是否已存在
