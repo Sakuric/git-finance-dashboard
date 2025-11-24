@@ -196,6 +196,18 @@
           <div class="auth-footer">
             <p>已有账户？<a href="#" @click.prevent="showLoginForm" class="login-link">立即登录</a></p>
           </div>
+          
+          <!-- 返回登录按钮 - 更醒目的样式 -->
+          <div style="margin-top: 20px; text-align: center;">
+            <button
+              type="button"
+              class="btn-back-to-login"
+              @click="showLoginForm"
+            >
+              <i class="fas fa-arrow-left"></i>
+              返回登录
+            </button>
+          </div>
         </div>
       </div>
     </div>
@@ -443,15 +455,23 @@ export default {
 
     // 处理注册
     const handleRegister = async () => {
-      if (!validateRegisterForm()) return
+      console.log('开始注册流程')
+      console.log('注册表单数据:', registerForm)
+      
+      if (!validateRegisterForm()) {
+        console.log('表单验证失败')
+        return
+      }
 
+      console.log('表单验证通过，开始注册')
       registerLoading.value = true
 
       // 模拟注册请求
       setTimeout(() => {
-        showNotification('注册成功！请登录', 'success')
+        console.log('注册请求完成')
+        registerLoading.value = false
         
-        // 清空表单
+        // 清空注册表单
         Object.keys(registerForm).forEach(key => {
           if (typeof registerForm[key] === 'boolean') {
             registerForm[key] = false
@@ -460,13 +480,17 @@ export default {
           }
         })
         
-        registerLoading.value = false
+        console.log('准备切换到登录表单')
+        console.log('当前表单:', currentForm.value)
         
-        // 切换到登录表单
-        setTimeout(() => {
-          currentForm.value = 'login'
-        }, 1500)
-      }, 1500)
+        // 立即切换到登录表单
+        currentForm.value = 'login'
+        
+        console.log('已切换到登录表单:', currentForm.value)
+        
+        // 显示成功消息
+        showNotification('注册成功！请登录', 'success')
+      }, 1000)
     }
 
     // 忘记密码
