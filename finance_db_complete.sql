@@ -1,17 +1,17 @@
 -- ============================================================
--- 量融智能金融平台数据库初始化脚本
+-- 量融智能金融平台数据库初始化脚本 (合并版)
 -- 数据库名称: finance_db
 -- 创建日期: 2024-11-24
--- 版本: v1.0 (精简版)
--- 说明: 包含11张核心表，简化权限管理，只保留普通用户角色
+-- 版本: v1.1 (合并了新浪财经API所需字段)
+-- 说明: 包含11张核心表，并对 stock_history 表进行了扩展
 -- ============================================================
 
 -- 删除已存在的数据库（谨慎使用！生产环境请注释此行）
 -- DROP DATABASE IF EXISTS finance_db;
 
 -- 创建数据库
-CREATE DATABASE IF NOT EXISTS finance_db 
-DEFAULT CHARACTER SET utf8mb4 
+CREATE DATABASE IF NOT EXISTS finance_db
+DEFAULT CHARACTER SET utf8mb4
 DEFAULT COLLATE utf8mb4_unicode_ci;
 
 USE finance_db;
@@ -65,30 +65,45 @@ CREATE TABLE stock_info (
     INDEX idx_industry (industry)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='股票信息表';
 
--- 股票历史数据表(K线数据) - 精简版：仅保留核心时间周期
+-- 股票历史数据表(K线数据) - 扩展版
 DROP TABLE IF EXISTS stock_history;
 CREATE TABLE stock_history (
     id BIGINT PRIMARY KEY AUTO_INCREMENT COMMENT '历史数据ID',
     stock_id BIGINT NOT NULL COMMENT '股票ID',
+    stock_code VARCHAR(20) COMMENT '股票代码',
     trade_date DATE NOT NULL COMMENT '交易日期',
     trade_time TIME COMMENT '交易时间(用于分钟级数据)',
-    timeframe VARCHAR(10) DEFAULT 'D' COMMENT '时间周期:1m-1分钟,5m-5分钟,15m-15分钟,30m-30分钟,60m-60分钟,D-日线,M-月线,Q-季线,Y-年线',
+    timeframe VARCHAR(10) DEFAULT 'D' COMMENT '时间周期:1m,5m,15m,30m,60m,D,M,Q,Y',
     open_price DECIMAL(10,2) NOT NULL COMMENT '开盘价',
     high_price DECIMAL(10,2) NOT NULL COMMENT '最高价',
     low_price DECIMAL(10,2) NOT NULL COMMENT '最低价',
     close_price DECIMAL(10,2) NOT NULL COMMENT '收盘价',
     volume BIGINT COMMENT '成交量(股)',
-    turnover DECIMAL(20,2) COMMENT '成交额(元)',
+    amount DECIMAL(20,2) COMMENT '成交额(元)',
+    change_amount DECIMAL(10,2) COMMENT '涨跌额',
     change_percent DECIMAL(6,2) COMMENT '涨跌幅(%)',
-    ma5 DECIMAL(10,2) COMMENT '5周期均线(适用于日K的5日均线)',
+    ma5 DECIMAL(10,2) COMMENT '5周期均线',
+    ma10 DECIMAL(10,2) COMMENT '10日均线',
+    ma20 DECIMAL(10,2) COMMENT '20日均线',
+    ma60 DECIMAL(10,2) COMMENT '60日均线',
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
     UNIQUE KEY uk_stock_date_time (stock_id, trade_date, trade_time, timeframe),
     INDEX idx_trade_date (trade_date),
     INDEX idx_stock_trade_date (stock_id, trade_date DESC),
     INDEX idx_timeframe (timeframe),
     INDEX idx_stock_timeframe_date (stock_id, timeframe, trade_date DESC),
+    INDEX idx_stock_code (stock_code),
+    INDEX idx_stock_code_date (stock_code, trade_date DESC),
     FOREIGN KEY (stock_id) REFERENCES stock_info(id) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='股票历史数据表-支持核心时间周期(1分/5分/15分/30分/60分/日K/5日K/月K/季K/年K)';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='股票历史数据表-扩展版';
+
+-- 更新现有数据的 stock_code（从 stock_info 表同步, 仅在旧数据存在时有效）
+UPDATE stock_history sh
+JOIN stock_info si ON sh.stock_id = si.id
+SET sh.stock_code = si.stock_code
+WHERE sh.stock_code IS NULL OR sh.stock_code = '';
+
 
 -- 技术指标表
 DROP TABLE IF EXISTS technical_indicators;
@@ -307,8 +322,7 @@ CREATE TABLE backtest_result (
     FOREIGN KEY (prompt_id) REFERENCES ai_prompt(id) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='回测结果表';
 
--- 
-提示词迭代日志表（核心创新功能-自动优化闭环）
+-- 提示词迭代日志表（核心创新功能-自动优化闭环）
 DROP TABLE IF EXISTS prompt_iteration_log;
 CREATE TABLE prompt_iteration_log (
     id BIGINT PRIMARY KEY AUTO_INCREMENT COMMENT '迭代日志ID',
@@ -351,7 +365,7 @@ INSERT INTO ai_prompt (user_id, title, content, category, version, is_active, is
 
 -- 用户自选股详情视图
 CREATE OR REPLACE VIEW v_user_favorite_detail AS
-SELECT 
+SELECT
     uf.id AS favorite_id,
     uf.user_id,
     u.username,
@@ -372,7 +386,7 @@ WHERE u.status = 1 AND s.status = 1;
 
 -- 投资建议详情视图
 CREATE OR REPLACE VIEW v_investment_advice_detail AS
-SELECT 
+SELECT
     ia.id AS advice_id,
     ia.user_id,
     u.username,
@@ -394,7 +408,7 @@ WHERE ia.is_valid = 1;
 
 -- 回测结果汇总视图
 CREATE OR REPLACE VIEW v_backtest_summary AS
-SELECT 
+SELECT
     br.id AS backtest_id,
     br.advice_id,
     ia.title AS advice_title,
@@ -427,32 +441,32 @@ CREATE PROCEDURE sp_add_favorite(
 BEGIN
     DECLARE v_stock_id BIGINT;
     DECLARE v_count INT;
-    
+
     -- 查询股票ID
     SELECT id INTO v_stock_id FROM stock_info WHERE stock_code = p_stock_code AND status = 1;
-    
+
     IF v_stock_id IS NULL THEN
         SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = '股票不存在或已停牌';
     END IF;
-    
+
     -- 检查是否已添加
     SELECT COUNT(*) INTO v_count FROM user_favorite WHERE user_id = p_user_id AND stock_id = v_stock_id;
-    
+
     IF v_count > 0 THEN
         SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = '该股票已在自选股列表中';
     END IF;
-    
+
     -- 检查自选股数量限制（最多50只）
     SELECT COUNT(*) INTO v_count FROM user_favorite WHERE user_id = p_user_id;
-    
+
     IF v_count >= 50 THEN
         SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = '自选股数量已达上限(50只)';
     END IF;
-    
+
     -- 添加自选股
-    INSERT INTO user_favorite (user_id, stock_id, sort_order) 
+    INSERT INTO user_favorite (user_id, stock_id, sort_order)
     VALUES (p_user_id, v_stock_id, v_count + 1);
-    
+
     SELECT '添加成功' AS message;
 END$$
 DELIMITER ;
@@ -465,13 +479,13 @@ CREATE PROCEDURE sp_get_latest_kline(
 )
 BEGIN
     DECLARE v_stock_id BIGINT;
-    
+
     SELECT id INTO v_stock_id FROM stock_info WHERE stock_code = p_stock_code;
-    
+
     IF v_stock_id IS NULL THEN
         SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = '股票不存在';
     END IF;
-    
+
     SELECT
         trade_date,
         trade_time,
@@ -481,7 +495,7 @@ BEGIN
         low_price,
         close_price,
         volume,
-        turnover,
+        amount,
         change_percent,
         ma5
     FROM stock_history
@@ -502,8 +516,8 @@ AFTER INSERT ON investment_advice
 FOR EACH ROW
 BEGIN
     IF NEW.prompt_id IS NOT NULL THEN
-        UPDATE ai_prompt 
-        SET usage_count = usage_count + 1 
+        UPDATE ai_prompt
+        SET usage_count = usage_count + 1
         WHERE id = NEW.prompt_id;
     END IF;
 END$$
@@ -516,11 +530,11 @@ BEFORE INSERT ON user_favorite
 FOR EACH ROW
 BEGIN
     DECLARE v_max_order INT;
-    
-    SELECT COALESCE(MAX(sort_order), 0) INTO v_max_order 
-    FROM user_favorite 
+
+    SELECT COALESCE(MAX(sort_order), 0) INTO v_max_order
+    FROM user_favorite
     WHERE user_id = NEW.user_id;
-    
+
     IF NEW.sort_order IS NULL OR NEW.sort_order = 0 THEN
         SET NEW.sort_order = v_max_order + 1;
     END IF;
@@ -541,13 +555,13 @@ CREATE TABLE IF NOT EXISTS db_version (
 
 INSERT INTO db_version (version, description) VALUES
 ('1.0.0', '初始化数据库-精简版(11张核心表)'),
-('1.1.0', '增强版-添加短线技术指标和自定义投资期限');
+('1.1.0', '增强版-添加新浪财经API所需字段');
 
 -- ============================================================
 -- 脚本执行完成提示
 -- ============================================================
 SELECT '========================================' AS '';
-SELECT '✅ 数据库 finance_db 初始化完成！' AS '状态';
+SELECT '✅ 数据库 finance_db 初始化完成 (合并版)！' AS '状态';
 SELECT '========================================' AS '';
 SELECT '包含表数量: 11张核心表' AS '📊 统计信息';
 SELECT '包含视图: 3个' AS '';
