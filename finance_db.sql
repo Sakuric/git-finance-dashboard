@@ -65,12 +65,14 @@ CREATE TABLE stock_info (
     INDEX idx_industry (industry)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='股票信息表';
 
--- 股票历史数据表(K线数据)
+-- 股票历史数据表(K线数据) - 精简版：仅保留核心时间周期
 DROP TABLE IF EXISTS stock_history;
 CREATE TABLE stock_history (
     id BIGINT PRIMARY KEY AUTO_INCREMENT COMMENT '历史数据ID',
     stock_id BIGINT NOT NULL COMMENT '股票ID',
     trade_date DATE NOT NULL COMMENT '交易日期',
+    trade_time TIME COMMENT '交易时间(用于分钟级数据)',
+    timeframe VARCHAR(10) DEFAULT 'D' COMMENT '时间周期:1m-1分钟,5m-5分钟,15m-15分钟,30m-30分钟,60m-60分钟,D-日线,M-月线,Q-季线,Y-年线',
     open_price DECIMAL(10,2) NOT NULL COMMENT '开盘价',
     high_price DECIMAL(10,2) NOT NULL COMMENT '最高价',
     low_price DECIMAL(10,2) NOT NULL COMMENT '最低价',
@@ -78,16 +80,15 @@ CREATE TABLE stock_history (
     volume BIGINT COMMENT '成交量(股)',
     turnover DECIMAL(20,2) COMMENT '成交额(元)',
     change_percent DECIMAL(6,2) COMMENT '涨跌幅(%)',
-    ma5 DECIMAL(10,2) COMMENT '5日均线',
-    ma10 DECIMAL(10,2) COMMENT '10日均线',
-    ma20 DECIMAL(10,2) COMMENT '20日均线',
-    ma60 DECIMAL(10,2) COMMENT '60日均线',
+    ma5 DECIMAL(10,2) COMMENT '5周期均线(适用于日K的5日均线)',
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
-    UNIQUE KEY uk_stock_date (stock_id, trade_date),
+    UNIQUE KEY uk_stock_date_time (stock_id, trade_date, trade_time, timeframe),
     INDEX idx_trade_date (trade_date),
     INDEX idx_stock_trade_date (stock_id, trade_date DESC),
+    INDEX idx_timeframe (timeframe),
+    INDEX idx_stock_timeframe_date (stock_id, timeframe, trade_date DESC),
     FOREIGN KEY (stock_id) REFERENCES stock_info(id) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='股票历史数据表';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='股票历史数据表-支持核心时间周期(1分/5分/15分/30分/60分/日K/5日K/月K/季K/年K)';
 
 -- 技术指标表
 DROP TABLE IF EXISTS technical_indicators;
@@ -166,13 +167,18 @@ CREATE TABLE shareholding_structure (
 -- 3. 用户投资偏好与自选股模块（2张表）
 -- ============================================================
 
--- 投资偏好表
+-- 投资偏好表 - 增强版：支持用户自定义投资期限
 DROP TABLE IF EXISTS investment_preference;
 CREATE TABLE investment_preference (
     id BIGINT PRIMARY KEY AUTO_INCREMENT COMMENT '偏好ID',
     user_id BIGINT NOT NULL UNIQUE COMMENT '用户ID',
     risk_tolerance_level TINYINT NOT NULL CHECK (risk_tolerance_level BETWEEN 1 AND 5) COMMENT '风险承受能力:1-保守,2-稳健,3-平衡,4-积极,5-激进',
-    investment_horizon VARCHAR(20) NOT NULL COMMENT '投资期限:短期/中期/长期',
+    investment_horizon_type VARCHAR(20) NOT NULL DEFAULT 'preset' COMMENT '期限类型:preset-预设(短期/中期/长期),custom-自定义',
+    investment_horizon_preset VARCHAR(20) COMMENT '预设投资期限:short-短期(1-3月),medium-中期(3-12月),long-长期(1年以上)',
+    investment_horizon_custom_days INT COMMENT '自定义投资期限(天数)',
+    investment_horizon_custom_months INT COMMENT '自定义投资期限(月数)',
+    investment_horizon_custom_years INT COMMENT '自定义投资期限(年数)',
+    investment_horizon_display VARCHAR(50) COMMENT '投资期限显示文本(如"6个月"、"2年")',
     capital_amount DECIMAL(15,2) COMMENT '投资金额',
     preferred_asset_classes VARCHAR(255) COMMENT '偏好资产类别',
     preferred_industry VARCHAR(255) COMMENT '偏好行业',
@@ -180,8 +186,12 @@ CREATE TABLE investment_preference (
     max_acceptable_loss DECIMAL(6,2) COMMENT '最大可接受亏损(%)',
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-    FOREIGN KEY (user_id) REFERENCES user_info(id) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='投资偏好表';
+    FOREIGN KEY (user_id) REFERENCES user_info(id) ON DELETE CASCADE,
+    CHECK (
+        (investment_horizon_type = 'preset' AND investment_horizon_preset IS NOT NULL) OR
+        (investment_horizon_type = 'custom' AND (investment_horizon_custom_days IS NOT NULL OR investment_horizon_custom_months IS NOT NULL OR investment_horizon_custom_years IS NOT NULL))
+    )
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='投资偏好表-支持预设和自定义投资期限';
 
 -- 用户自选股表
 DROP TABLE IF EXISTS user_favorite;
@@ -462,8 +472,10 @@ BEGIN
         SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = '股票不存在';
     END IF;
     
-    SELECT 
+    SELECT
         trade_date,
+        trade_time,
+        timeframe,
         open_price,
         high_price,
         low_price,
@@ -471,12 +483,9 @@ BEGIN
         volume,
         turnover,
         change_percent,
-        ma5,
-        ma10,
-        ma20,
-        ma60
+        ma5
     FROM stock_history
-    WHERE stock_id = v_stock_id
+    WHERE stock_id = v_stock_id AND timeframe = 'D'
     ORDER BY trade_date DESC
     LIMIT p_days;
 END$$
@@ -530,7 +539,9 @@ CREATE TABLE IF NOT EXISTS db_version (
     applied_at DATETIME DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='数据库版本管理表';
 
-INSERT INTO db_version (version, description) VALUES ('1.0.0', '初始化数据库-精简版(11张核心表)');
+INSERT INTO db_version (version, description) VALUES
+('1.0.0', '初始化数据库-精简版(11张核心表)'),
+('1.1.0', '增强版-添加短线技术指标和自定义投资期限');
 
 -- ============================================================
 -- 脚本执行完成提示
