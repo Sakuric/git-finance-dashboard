@@ -10,8 +10,14 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
+
+import org.json.JSONArray;
+import org.json.JSONObject;
 
 /**
  * 新浪财经API调用服务
@@ -92,6 +98,88 @@ public class SinaApiService {
 
         return executeRequest(url);
     }
+    /**
+     * 获取所有A股列表
+     * @return 包含股票代码和名称的Map列表
+     */
+    public List<Map<String, String>> fetchAllStockCodes() {
+        List<Map<String, String>> stockList = new ArrayList<>();
+        
+        log.info("开始从新浪财经获取所有A股列表...");
+        
+        // 分别获取上海A股和深圳A股，使用分页方式
+        String[] markets = {"sh_a", "sz_a"};
+        String[] marketNames = {"上海A股", "深圳A股"};
+        
+        for (int m = 0; m < markets.length; m++) {
+            String market = markets[m];
+            String marketName = marketNames[m];
+            int page = 1;
+            int pageSize = 100; // 新浪接口每次最多返回100条
+            boolean hasMoreData = true;
+            
+            log.info("开始获取{}数据...", marketName);
+            
+            while (hasMoreData) {
+                String url = String.format(
+                    "http://vip.stock.finance.sina.com.cn/quotes_service/api/json_v2.php/Market_Center.getHQNodeData?page=%d&num=%d&sort=symbol&asc=1&node=%s&symbol=&_s_r_a=page",
+                    page, pageSize, market
+                );
+                
+                log.info("正在请求{}第{}页数据...", marketName, page);
+                
+                String response = executeRequest(url);
+                if (response == null) {
+                    log.error("获取{}第{}页数据失败", marketName, page);
+                    break;
+                }
+                
+                try {
+                    // 新浪返回的是直接的JSON数组，不需要JSONP解析
+                    JSONArray jsonArray = new JSONArray(response);
+                    
+                    if (jsonArray.length() == 0) {
+                        log.info("{}第{}页没有数据，获取结束", marketName, page);
+                        hasMoreData = false;
+                        break;
+                    }
+                    
+                    for (int i = 0; i < jsonArray.length(); i++) {
+                        JSONObject stock = jsonArray.getJSONObject(i);
+                        Map<String, String> stockMap = new HashMap<>();
+                        
+                        // 新浪返回的代码格式是sh600519或sz000001，我们需要转换为600519或000001
+                        String fullCode = stock.getString("symbol");
+                        String code = fullCode.substring(2);
+                        
+                        stockMap.put("code", code);
+                        stockMap.put("name", stock.getString("name"));
+                        stockMap.put("exchange", market.startsWith("sh") ? "SH" : "SZ");
+                        stockList.add(stockMap);
+                    }
+                    
+                    log.info("{}第{}页获取到 {} 只A股", marketName, page, jsonArray.length());
+                    
+                    // 如果返回的数据少于pageSize，说明已经是最后一页了
+                    if (jsonArray.length() < pageSize) {
+                        hasMoreData = false;
+                    } else {
+                        page++;
+                    }
+                    
+                    // 防止请求过于频繁
+                    Thread.sleep(300);
+                    
+                } catch (Exception e) {
+                    log.error("解析{}第{}页JSON失败, response: {}", marketName, page, response, e);
+                    break;
+                }
+            }
+        }
+        
+        log.info("成功从新浪财经获取到总共 {} 只A股", stockList.size());
+        return stockList;
+    }
 
     /**
      * 执行HTTP请求
@@ -100,10 +188,15 @@ public class SinaApiService {
      * @return 响应内容，失败返回null
      */
     private String executeRequest(String url) {
+        String referer = "https://finance.sina.com.cn/";
+        if (url.contains("eastmoney.com")) {
+            referer = "https://quote.eastmoney.com/";
+        }
+
         Request request = new Request.Builder()
                 .url(url)
                 .get()
-                .addHeader("Referer", "https://finance.sina.com.cn")
+                .addHeader("Referer", referer)
                 .addHeader("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
                 .addHeader("Accept", "*/*")
                 .addHeader("Accept-Language", "zh-CN,zh;q=0.9,en;q=0.8")

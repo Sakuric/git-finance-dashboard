@@ -13,6 +13,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
 /**
  * 新浪数据持久化服务
@@ -24,6 +25,9 @@ public class SinaDataPersistenceService {
 
     @Autowired
     private SinaDataSyncService sinaDataSyncService;
+
+    @Autowired
+    private SinaApiService sinaApiService;
 
     @Autowired
     private StockInfoMapper stockInfoMapper;
@@ -254,5 +258,86 @@ public class SinaDataPersistenceService {
 
         log.info("从数据库获取到{}只股票", stockCodes.size());
         return stockCodes;
+    }
+
+    /**
+     * 初始化所有A股基本信息到数据库
+     */
+    @Transactional(rollbackFor = Exception.class)
+    public void initAllStockInfos() {
+        log.info("开始初始化所有A股基本信息...");
+
+        // 1. 从API获取所有股票列表
+        List<Map<String, String>> allStocks = sinaApiService.fetchAllStockCodes();
+        if (allStocks.isEmpty()) {
+            log.warn("未能从API获取到任何股票信息");
+            return;
+        }
+
+        // 2. 转换为StockInfo实体列表
+        List<StockInfo> stockInfoList = new ArrayList<>();
+        for (Map<String, String> stockMap : allStocks) {
+            StockInfo stockInfo = new StockInfo();
+            String code = stockMap.get("code");
+            String name = stockMap.get("name");
+
+            stockInfo.setStockSymbol(code);
+            stockInfo.setStockName(name);
+            stockInfo.setExchange(stockMap.get("exchange"));
+            stockInfo.setStockCode(code);
+            
+            stockInfo.setStatus(1); // 默认正常交易
+            stockInfo.setCreatedAt(LocalDateTime.now());
+            stockInfo.setUpdatedAt(LocalDateTime.now());
+
+            stockInfoList.add(stockInfo);
+        }
+
+        // 3. 批量插入或更新
+        if (!stockInfoList.isEmpty()) {
+            log.info("准备批量插入/更新 {} 条股票基本信息...", stockInfoList.size());
+            try {
+                // Mapper需要支持批量插入或更新
+                stockInfoMapper.batchInsertOrUpdate(stockInfoList);
+                log.info("批量插入/更新股票基本信息成功！");
+            } catch (Exception e) {
+                log.error("批量插入/更新股票基本信息失败", e);
+                throw new RuntimeException("批量保存StockInfo失败", e);
+            }
+        }
+    }
+    /**
+     * 同步所有股票的详细数据（价格等）
+     */
+    public void syncAllStockDetails() {
+        log.info("开始同步所有A股的详细数据...");
+
+        // 1. 从数据库获取所有股票代码
+        List<String> allStockCodes = getAllStockCodesFromDatabase();
+        if (allStockCodes.isEmpty()) {
+            log.warn("数据库中没有任何股票可同步");
+            return;
+        }
+
+        // 2. 分批处理
+        int batchSize = 50; // 新浪接口每批建议不超过80
+        for (int i = 0; i < allStockCodes.size(); i += batchSize) {
+            int end = Math.min(i + batchSize, allStockCodes.size());
+            List<String> batchCodes = allStockCodes.subList(i, end);
+            
+            log.info("正在同步第 {} - {} 条股票数据...", i + 1, end);
+            
+            try {
+                // 3. 批量同步
+                batchSyncStocksToDatabase(batchCodes);
+                
+                // 4. 增加延时，防止请求过于频繁
+                Thread.sleep(500);
+            } catch (Exception e) {
+                log.error("同步批次失败: {} - {}", i + 1, end, e);
+            }
+        }
+        
+        log.info("所有A股的详细数据同步完成！");
     }
 }

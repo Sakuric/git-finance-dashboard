@@ -59,7 +59,6 @@ CREATE TABLE stock_info (
     last_update_time DATETIME COMMENT '最后更新时间',
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-    INDEX idx_stock_code (stock_code),
     INDEX idx_stock_name (stock_name),
     INDEX idx_exchange (exchange),
     INDEX idx_industry (industry)

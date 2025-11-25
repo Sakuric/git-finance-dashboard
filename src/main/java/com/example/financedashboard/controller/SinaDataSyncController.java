@@ -181,4 +181,57 @@ public class SinaDataSyncController {
             return Result.error(500, "查询失败: " + e.getMessage());
         }
     }
+
+    /**
+     * 初始化所有A股基本信息到数据库
+     * @return 初始化结果
+     */
+    @PostMapping("/init-all")
+    public Result<Map<String, Object>> initAllStocks() {
+        log.info("收到初始化所有A股基本信息请求");
+
+        try {
+            long startTime = System.currentTimeMillis();
+            persistenceService.initAllStockInfos();
+            long duration = System.currentTimeMillis() - startTime;
+
+            // 获取导入后的总数
+            List<String> stockCodes = persistenceService.getAllStockCodesFromDatabase();
+
+            Map<String, Object> data = new HashMap<>();
+            data.put("total", stockCodes.size());
+            data.put("duration", duration + "ms");
+            data.put("message", "初始化所有A股基本信息完成");
+
+            return Result.success(data);
+
+        } catch (Exception e) {
+            log.error("初始化所有A股基本信息失败", e);
+            return Result.error(500, "初始化失败: " + e.getMessage());
+        }
+    }
+    /**
+     * 同步所有A股的详细数据（价格等）
+     * @return 同步结果
+     */
+    @PostMapping("/all-details")
+    public Result<Map<String, Object>> syncAllStockDetails() {
+        log.info("收到同步所有A股详细数据请求");
+
+        try {
+            long startTime = System.currentTimeMillis();
+            persistenceService.syncAllStockDetails();
+            long duration = System.currentTimeMillis() - startTime;
+
+            Map<String, Object> data = new HashMap<>();
+            data.put("duration", duration + "ms");
+            data.put("message", "同步所有A股详细数据完成");
+
+            return Result.success(data);
+
+        } catch (Exception e) {
+            log.error("同步所有A股详细数据失败", e);
+            return Result.error(500, "同步失败: " + e.getMessage());
+        }
+    }
 }

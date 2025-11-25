@@ -14,6 +14,7 @@ public interface StockInfoMapper {
 
     int insert(StockInfo stockInfo);
     int batchInsert(@Param("stockInfos") List<StockInfo> stockInfos);
+    int batchInsertOrUpdate(@Param("stockInfos") List<StockInfo> stockInfos);
     int update(StockInfo stockInfo);
     int deleteByStockCode(@Param("stockCode")String stockCode);
 
