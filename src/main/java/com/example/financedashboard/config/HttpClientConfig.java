@@ -21,9 +21,9 @@ public class HttpClientConfig {
     @Bean
     public OkHttpClient okHttpClient() {
         return new OkHttpClient.Builder()
-                .connectTimeout(5, TimeUnit.SECONDS)      // 连接超时5秒
-                .readTimeout(10, TimeUnit.SECONDS)        // 读取超时10秒
-                .writeTimeout(10, TimeUnit.SECONDS)       // 写入超时10秒
+                .connectTimeout(15, TimeUnit.SECONDS)     // 连接超时15秒
+                .readTimeout(30, TimeUnit.SECONDS)        // 读取超时30秒
+                .writeTimeout(30, TimeUnit.SECONDS)       // 写入超时30秒
                 .connectionPool(new ConnectionPool(10, 5, TimeUnit.MINUTES))  // 连接池：最多10个连接，空闲5分钟
                 .retryOnConnectionFailure(true)           // 连接失败时自动重试
                 .build();

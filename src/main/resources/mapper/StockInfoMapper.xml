@@ -52,6 +52,20 @@
         </foreach>
     </insert>
 
+    <insert id="batchInsertOrUpdate" parameterType="java.util.List">
+        INSERT INTO stock_info (stock_code, stock_symbol, stock_name, exchange, status, created_at, updated_at)
+        VALUES
+        <foreach collection="stockInfos" item="stock" separator=",">
+            (#{stock.stockCode}, #{stock.stockSymbol}, #{stock.stockName}, #{stock.exchange},
+             #{stock.status}, #{stock.createdAt}, #{stock.updatedAt})
+        </foreach>
+        ON DUPLICATE KEY UPDATE
+        stock_name = VALUES(stock_name),
+        exchange = VALUES(exchange),
+        status = VALUES(status),
+        updated_at = VALUES(updated_at)
+    </insert>
+
     <update id="update" parameterType="com.example.financedashboard.entity.StockInfo">
         UPDATE stock_info
         SET stock_symbol = #{stockSymbol},
