@@ -39,6 +39,7 @@ public class SecurityConfig {
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(authz -> authz
                         .requestMatchers("/api/users/register", "/api/users/login").permitAll()
+                        .requestMatchers("/api/test/**").permitAll() // 允许访问测试接口
                         .requestMatchers("/error").permitAll() // 允许访问错误页面
                         .anyRequest().authenticated())
                 .httpBasic(httpBasic -> httpBasic.disable()) // 禁用HTTP Basic认证

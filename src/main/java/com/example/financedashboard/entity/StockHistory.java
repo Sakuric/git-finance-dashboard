@@ -18,6 +18,7 @@ import java.time.LocalDateTime;
 @NoArgsConstructor
 public class StockHistory {
     private Long id;                    // 历史数据ID，主键
+    private String stockCode;           // 股票代码（新增，方便直接查询）
     private Long stockId;               // 股票ID，外键关联stock_info表
     private LocalDate tradeDate;        // 交易日期
     private BigDecimal openPrice;       // 开盘价
@@ -25,11 +26,13 @@ public class StockHistory {
     private BigDecimal lowPrice;        // 最低价
     private BigDecimal closePrice;      // 收盘价
     private Long volume;                // 成交量(股)
-    private BigDecimal turnover;        // 成交额(元)
+    private BigDecimal amount;          // 成交额(元)，原turnover改名为amount
+    private BigDecimal changeAmount;    // 涨跌额（新增）
     private BigDecimal changePercent;   // 涨跌幅(%)
     private BigDecimal ma5;             // 5日均线
     private BigDecimal ma10;            // 10日均线
     private BigDecimal ma20;            // 20日均线
     private BigDecimal ma60;            // 60日均线
     private LocalDateTime createdAt;    // 创建时间
+    private LocalDateTime updatedAt;    // 更新时间（新增）
 }
