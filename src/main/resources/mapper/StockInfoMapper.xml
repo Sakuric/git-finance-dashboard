@@ -91,6 +91,10 @@
     <select id="getAllStockCodes" resultType="java.lang.String">
         SELECT stock_code FROM stock_info ORDER BY stock_code ASC
     </select>
+    
+    <select id="findIdByCode" resultType="java.lang.Long">
+        SELECT id FROM stock_info WHERE stock_code = #{stockCode}
+    </select>
 
     <update id="updateStockCompleteInfo">
         UPDATE stock_info
