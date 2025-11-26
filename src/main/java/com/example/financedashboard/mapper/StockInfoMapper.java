@@ -24,6 +24,11 @@ public interface StockInfoMapper {
      * 获取所有股票代码
      */
     List<String> getAllStockCodes();
+    
+    /**
+     * 根据股票代码获取ID
+     */
+    Long findIdByCode(@Param("stockCode") String stockCode);
 
     /**
      * 更新股票的完整信息（行业、板块、市值、上市日期）
