@@ -16,9 +16,9 @@ import java.time.LocalDateTime;
 @NoArgsConstructor
 public class ShareholdingStructure {
     private Long id;                        // 结构ID，主键
-    private Long stockId;                   // 股票ID，外键关联stock_info表，唯一
+    private String stockCode;               // 股票代码
     private Long totalShares;               // 总股本
-    private Long floatShares;               // 流通股本
+    private Long circulatingShares;         // 流通股本
     private Integer majorShareholderCount;  // 主要股东数量
     private LocalDateTime createdAt;        // 创建时间
     private LocalDateTime updatedAt;        // 更新时间
