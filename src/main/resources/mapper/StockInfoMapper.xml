@@ -87,4 +87,27 @@
     <delete id="deleteByStockCode">
         DELETE FROM stock_info WHERE stock_code = #{stockCode}
     </delete>
+
+    <select id="getAllStockCodes" resultType="java.lang.String">
+        SELECT stock_code FROM stock_info ORDER BY stock_code ASC
+    </select>
+
+    <update id="updateStockCompleteInfo">
+        UPDATE stock_info
+        SET
+            <if test="industry != null">
+                industry = #{industry},
+            </if>
+            <if test="sector != null">
+                sector = #{sector},
+            </if>
+            <if test="marketValue != null">
+                market_value = #{marketValue},
+            </if>
+            <if test="listingDate != null">
+                listing_date = #{listingDate},
+            </if>
+            updated_at = NOW()
+        WHERE stock_code = #{stockCode}
+    </update>
 </mapper>
