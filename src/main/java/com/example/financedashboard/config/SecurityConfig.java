@@ -41,6 +41,7 @@ public class SecurityConfig {
                         .requestMatchers("/api/users/register", "/api/users/login").permitAll()
                         .requestMatchers("/api/test/**").permitAll() // 允许访问测试接口
                         .requestMatchers("/api/sina/sync/**").permitAll() // 允许访问新浪数据同步接口
+                        .requestMatchers("/api/crawler/**").permitAll() // 允许访问爬虫接口
                         .requestMatchers("/error").permitAll() // 允许访问错误页面
                         .anyRequest().authenticated())
                 .httpBasic(httpBasic -> httpBasic.disable()) // 禁用HTTP Basic认证
