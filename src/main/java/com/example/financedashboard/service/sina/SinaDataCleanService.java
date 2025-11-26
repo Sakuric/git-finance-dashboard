@@ -91,31 +91,42 @@ public class SinaDataCleanService {
         BigDecimal high = dto.getHighPrice();
         BigDecimal low = dto.getLowPrice();
         BigDecimal open = dto.getOpenPrice();
+        BigDecimal preClose = dto.getPreClosePrice();
 
-        // 当前价格必须大于0
+        // 如果当前价格为0，检查是否是停牌或非交易时间
         if (current.compareTo(BigDecimal.ZERO) <= 0) {
-            log.warn("当前价格<=0: {}, price={}", dto.getStockCode(), current);
-            return false;
+            // 如果有昨收价，说明股票存在，可能是停牌或非交易时间
+            if (preClose != null && preClose.compareTo(BigDecimal.ZERO) > 0) {
+                log.debug("股票 {} 当前价格为0，但有昨收价 {}，可能停牌或非交易时间",
+                        dto.getStockCode(), preClose);
+                // 使用昨收价作为当前价
+                dto.setCurrentPrice(preClose);
+                return true;
+            } else {
+                log.warn("当前价格<=0且无昨收价: {}, price={}", dto.getStockCode(), current);
+                return false;
+            }
         }
 
         // 如果有最高价和最低价，验证逻辑关系
-        if (high != null && low != null) {
+        if (high != null && low != null &&
+            high.compareTo(BigDecimal.ZERO) > 0 && low.compareTo(BigDecimal.ZERO) > 0) {
             // 最高价必须 >= 最低价
             if (high.compareTo(low) < 0) {
-                log.warn("最高价<最低价: {}, high={}, low={}", 
+                log.warn("最高价<最低价: {}, high={}, low={}",
                         dto.getStockCode(), high, low);
                 return false;
             }
 
             // 当前价应该在最高最低之间（允许小幅偏差）
             if (current.compareTo(high.multiply(new BigDecimal("1.01"))) > 0) {
-                log.warn("当前价>最高价: {}, current={}, high={}", 
+                log.warn("当前价>最高价: {}, current={}, high={}",
                         dto.getStockCode(), current, high);
                 return false;
             }
 
             if (current.compareTo(low.multiply(new BigDecimal("0.99"))) < 0) {
-                log.warn("当前价<最低价: {}, current={}, low={}", 
+                log.warn("当前价<最低价: {}, current={}, low={}",
                         dto.getStockCode(), current, low);
                 return false;
             }
