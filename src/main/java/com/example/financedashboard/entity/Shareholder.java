@@ -18,13 +18,13 @@ import java.time.LocalDateTime;
 @NoArgsConstructor
 public class Shareholder {
     private Long id;                        // 股东ID，主键
-    private Long stockId;                   // 股票ID，外键关联stock_info表
+    private String stockCode;               // 股票代码
     private String shareholderName;         // 股东名称
-    private Long holdingShares;             // 持股数量
-    private BigDecimal holdingPercentage;   // 持股比例(%)
-    private Long changeShares;              // 变动股数
-    private BigDecimal changePercentage;    // 变动比例(%)
+    private Long holdingQuantity;           // 持股数量
+    private BigDecimal holdingRatio;        // 持股比例(%)
+    private String change;                  // 变动情况
+    private String shareholderType;         // 股东类型
     private LocalDate reportDate;           // 报告期
-    private Integer isInstitutional;        // 是否机构投资者：0-否，1-是
     private LocalDateTime createdAt;        // 创建时间
+    private LocalDateTime updatedAt;        // 更新时间
 }

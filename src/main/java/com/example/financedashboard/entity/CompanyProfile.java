@@ -17,11 +17,10 @@ import java.time.LocalDateTime;
 @NoArgsConstructor
 public class CompanyProfile {
     private Long id;                    // 公司ID，主键
-    private Long stockId;               // 股票ID，外键关联stock_info表，唯一
+    private String stockCode;           // 股票代码
     private String companyName;         // 公司全称
     private String description;         // 公司简介
     private String industry;            // 所属行业
-    private String subIndustry;         // 细分行业
     private BigDecimal marketCap;       // 总市值
     private BigDecimal peRatio;         // 市盈率
     private BigDecimal pbRatio;         // 市净率
