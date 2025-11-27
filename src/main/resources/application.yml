@@ -5,10 +5,14 @@ spring:
   application:
     name: finance-dashboard
   datasource:
-    url: jdbc:mysql://localhost:3306/finance_db?useSSL=false&serverTimezone=UTC
+    url: jdbc:mysql://localhost:3306/finance_db?useSSL=false&serverTimezone=UTC&autoReconnect=true
     username: root
     password: 123456
     driver-class-name: com.mysql.cj.jdbc.Driver
+    hikari:
+      auto-commit: true
+      connection-timeout: 30000
+      maximum-pool-size: 10
 
 
 mybatis:

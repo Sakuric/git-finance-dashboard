@@ -6,7 +6,6 @@
     <resultMap id="BaseResultMap" type="com.example.financedashboard.entity.StockInfo">
         <id column="id" property="id" />
         <result column="stock_code" property="stockCode" />
-        <result column="stock_symbol" property="stockSymbol" />
         <result column="stock_name" property="stockName" />
         <result column="exchange" property="exchange" />
         <result column="industry" property="industry" />
@@ -15,7 +14,7 @@
         <result column="current_price" property="currentPrice" />
         <result column="yesterday_close" property="yesterdayClose" />
         <result column="change_percent" property="changePercent" />
-        <result column="market_value" property="marketValue" />
+        <result column="total_market_cap" property="totalMarketCap" />
         <result column="status" property="status" />
         <result column="last_update_time" property="lastUpdateTime" />
         <result column="created_at" property="createdAt" />
@@ -31,32 +30,32 @@
     </select>
 
     <insert id="insert" parameterType="com.example.financedashboard.entity.StockInfo" useGeneratedKeys="true" keyProperty="id">
-        INSERT INTO stock_info (stock_code, stock_symbol, stock_name, exchange, industry, sector,
+        INSERT INTO stock_info (stock_code, stock_name, exchange, industry, sector,
                                 listing_date, current_price, yesterday_close, change_percent,
-                                market_value, status, last_update_time, created_at, updated_at)
-        VALUES (#{stockCode}, #{stockSymbol}, #{stockName}, #{exchange}, #{industry}, #{sector},
-                #{listingDate}, #{currentPrice}, #{yesterdayClose}, #{changePercent},
-                #{marketValue}, #{status}, #{lastUpdateTime}, #{createdAt}, #{updatedAt})
+                                total_market_cap, status, last_update_time, created_at, updated_at)
+       VALUES (#{stockCode}, #{stockName}, #{exchange}, #{industry}, #{sector},
+               #{listingDate}, #{currentPrice}, #{yesterdayClose}, #{changePercent},
+               #{totalMarketCap}, #{status}, #{lastUpdateTime}, #{createdAt}, #{updatedAt})
     </insert>
 
     <insert id="batchInsert" parameterType="java.util.List">
-        INSERT INTO stock_info (stock_code, stock_symbol, stock_name, exchange, industry, sector,
+        INSERT INTO stock_info (stock_code, stock_name, exchange, industry, sector,
                                 listing_date, current_price, yesterday_close, change_percent,
-                                market_value, status, last_update_time, created_at, updated_at)
-        VALUES
-        <foreach collection="stockInfos" item="stock" separator=",">
-            (#{stock.stockCode}, #{stock.stockSymbol}, #{stock.stockName}, #{stock.exchange},
-             #{stock.industry}, #{stock.sector}, #{stock.listingDate}, #{stock.currentPrice},
-             #{stock.yesterdayClose}, #{stock.changePercent}, #{stock.marketValue}, #{stock.status},
-             #{stock.lastUpdateTime}, #{stock.createdAt}, #{stock.updatedAt})
+                                total_market_cap, status, last_update_time, created_at, updated_at)
+       VALUES
+       <foreach collection="stockInfos" item="stock" separator=",">
+           (#{stock.stockCode}, #{stock.stockName}, #{stock.exchange},
+            #{stock.industry}, #{stock.sector}, #{stock.listingDate}, #{stock.currentPrice},
+            #{stock.yesterdayClose}, #{stock.changePercent}, #{stock.totalMarketCap}, #{stock.status},
+            #{stock.lastUpdateTime}, #{stock.createdAt}, #{stock.updatedAt})
         </foreach>
     </insert>
 
     <insert id="batchInsertOrUpdate" parameterType="java.util.List">
-        INSERT INTO stock_info (stock_code, stock_symbol, stock_name, exchange, status, created_at, updated_at)
+        INSERT INTO stock_info (stock_code, stock_name, exchange, status, created_at, updated_at)
         VALUES
         <foreach collection="stockInfos" item="stock" separator=",">
-            (#{stock.stockCode}, #{stock.stockSymbol}, #{stock.stockName}, #{stock.exchange},
+            (#{stock.stockCode}, #{stock.stockName}, #{stock.exchange},
              #{stock.status}, #{stock.createdAt}, #{stock.updatedAt})
         </foreach>
         ON DUPLICATE KEY UPDATE
@@ -68,16 +67,11 @@
 
     <update id="update" parameterType="com.example.financedashboard.entity.StockInfo">
         UPDATE stock_info
-        SET stock_symbol = #{stockSymbol},
-            stock_name = #{stockName},
+        SET stock_name = #{stockName},
             exchange = #{exchange},
-            industry = #{industry},
-            sector = #{sector},
-            listing_date = #{listingDate},
             current_price = #{currentPrice},
             yesterday_close = #{yesterdayClose},
             change_percent = #{changePercent},
-            market_value = #{marketValue},
             status = #{status},
             last_update_time = #{lastUpdateTime},
             updated_at = #{updatedAt}
@@ -98,20 +92,21 @@
 
     <update id="updateStockCompleteInfo">
         UPDATE stock_info
-        SET
+        <set>
             <if test="industry != null">
                 industry = #{industry},
             </if>
             <if test="sector != null">
                 sector = #{sector},
             </if>
-            <if test="marketValue != null">
-                market_value = #{marketValue},
+            <if test="totalMarketCap != null">
+                total_market_cap = #{totalMarketCap},
             </if>
             <if test="listingDate != null">
                 listing_date = #{listingDate},
             </if>
             updated_at = NOW()
+        </set>
         WHERE stock_code = #{stockCode}
     </update>
 </mapper>

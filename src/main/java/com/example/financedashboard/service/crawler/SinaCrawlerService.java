@@ -4,6 +4,8 @@ import com.example.financedashboard.dto.sina.SinaIndustryDTO;
 import com.example.financedashboard.mapper.StockInfoMapper;
 import lombok.extern.slf4j.Slf4j;
 import okhttp3.OkHttpClient;
+import org.apache.ibatis.session.SqlSession;
+import org.apache.ibatis.session.SqlSessionFactory;
 import okhttp3.Request;
 import okhttp3.Response;
 import org.json.JSONObject;
@@ -29,6 +31,9 @@ public class SinaCrawlerService {
     
     @Autowired
     private OkHttpClient okHttpClient;
+    
+    @Autowired
+    private SqlSessionFactory sqlSessionFactory;
 
     // 东方财富公司概况API
     private static final String EASTMONEY_API = "http://emweb.securities.eastmoney.com/PC_HSF10/CompanySurvey/PageAjax";
@@ -120,9 +125,11 @@ public class SinaCrawlerService {
                     // 获取总市值 - 使用腾讯财经API
                     try {
                         BigDecimal marketValue = fetchMarketValue(stockCode);
-                        if (marketValue != null) {
-                            dto.setMarketValue(marketValue);
-                            log.info("✓ 总市值: {} 亿元", marketValue.divide(new BigDecimal("100000000"), 2, BigDecimal.ROUND_HALF_UP));
+                        if (marketValue != null && marketValue.compareTo(BigDecimal.ZERO) > 0) {
+                            dto.setTotalMarketCap(marketValue);
+                            log.info("✓ 总市值: {} 亿元", marketValue);
+                        } else {
+                            log.warn("总市值获取失败或为0，股票代码: {}", stockCode);
                         }
                     } catch (Exception e) {
                         log.warn("获取总市值失败: {}", e.getMessage());
@@ -149,7 +156,6 @@ public class SinaCrawlerService {
      * @param stockCode 股票代码
      * @return 是否更新成功
      */
-    @Transactional
     public boolean updateStockInfo(String stockCode) {
         SinaIndustryDTO dto = crawlStockInfo(stockCode);
         if (dto == null) {
@@ -161,10 +167,16 @@ public class SinaCrawlerService {
                     stockCode,
                     dto.getIndustry(),
                     dto.getSector(),
-                    dto.getMarketValue(),
+                    dto.getTotalMarketCap(),
                     dto.getListingDate()
             );
-            log.info("更新股票信息到数据库: {}, 影响行数: {}", stockCode, rows);
+            
+            // 强制提交事务
+            try (SqlSession sqlSession = sqlSessionFactory.openSession(false)) {
+                sqlSession.commit();
+            }
+            
+            log.info("✅ 成功更新股票信息到数据库: {}, 影响行数: {}", stockCode, rows);
             return rows > 0;
         } catch (Exception e) {
             log.error("更新股票信息到数据库失败: {}, 错误: {}", stockCode, e.getMessage());
@@ -178,7 +190,6 @@ public class SinaCrawlerService {
      *
      * @return 更新结果统计
      */
-    @Transactional
     public Map<String, Integer> updateAllStockInfo() {
         Map<String, Integer> stats = new HashMap<>();
         stats.put("total", 0);
@@ -263,54 +274,59 @@ public class SinaCrawlerService {
      * 使用腾讯财经API获取实时行情,计算总市值
      *
      * @param stockCode 股票代码
-     * @return 总市值(元),失败返回null
+     * @return 总市值(亿元),失败返回null
      */
     private BigDecimal fetchMarketValue(String stockCode) {
         try {
             String prefix = stockCode.startsWith("6") ? "sh" : "sz";
             String url = "http://qt.gtimg.cn/q=" + prefix + stockCode;
-            
+
             Request request = new Request.Builder()
                     .url(url)
                     .get()
                     .addHeader("Referer", "http://qt.gtimg.cn/")
                     .addHeader("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
                     .build();
-            
+
             try (Response response = okHttpClient.newCall(request).execute()) {
                 if (!response.isSuccessful() || response.body() == null) {
+                    log.warn("请求腾讯财经API失败: HTTP {}", response.code());
                     return null;
                 }
-                
+
                 String result = response.body().string();
-                // 格式: v_sz000001="51~平安银行~000001~11.72~...~19405600653~19405918198~..."
-                // 倒数第4个字段是总股本(股), 第3个字段是当前价
-                
+                // 响应格式: v_sh600519="1~贵州茅台~...~流通市值(万)~总市值(万)~..."
+                // 字段索引从0开始, 44是流通市值, 45是总市值
+
                 int start = result.indexOf("\"") + 1;
                 int end = result.lastIndexOf("\"");
                 if (start < 1 || end < start) {
+                    log.warn("无效的API响应格式: {}", result);
                     return null;
                 }
-                
+
                 String data = result.substring(start, end);
                 String[] fields = data.split("~");
-                
-                if (fields.length < 45) {
+
+                if (fields.length < 46) {
+                    log.warn("API响应字段数量不足: {}", fields.length);
                     return null;
                 }
-                
-                // 当前价格 (索引3)
-                BigDecimal currentPrice = new BigDecimal(fields[3]);
-                // 总股本 (索引44, 单位:股)
-                BigDecimal totalShares = new BigDecimal(fields[44]);
-                
-                // 总市值 = 总股本 * 当前价格
-                BigDecimal marketValue = totalShares.multiply(currentPrice);
-                
-                return marketValue;
+
+                // 总市值 (索引45, 单位: 万元)
+                String marketValueStr = fields[45];
+                if (marketValueStr == null || marketValueStr.isEmpty() || marketValueStr.equals("0.00")) {
+                    log.warn("总市值数据为空或为0, 股票代码: {}", stockCode);
+                    return null;
+                }
+
+                BigDecimal marketValueInYiYuan = new BigDecimal(marketValueStr);
+
+                // API返回的单位直接就是“亿元”，无需转换
+                return marketValueInYiYuan;
             }
         } catch (Exception e) {
-            log.debug("获取市值失败: {}", e.getMessage());
+            log.error("获取总市值时发生异常, 股票代码: {}: {}", stockCode, e.getMessage());
             return null;
         }
     }
