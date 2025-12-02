@@ -44,6 +44,7 @@ public class SecurityConfig {
                         .requestMatchers("/api/crawler/**").permitAll() // 允许访问股票信息爬虫接口
                         .requestMatchers("/api/history-crawler/**").permitAll() // 允许访问历史数据爬虫接口(已废弃)
                         .requestMatchers("/api/stock-data/**").permitAll() // 允许访问股票实时数据接口
+                        .requestMatchers("/api/technical-indicators/**").permitAll() // 允许访问技术指标API接口
                         .requestMatchers("/error").permitAll() // 允许访问错误页面
                         .anyRequest().authenticated())
                 .httpBasic(httpBasic -> httpBasic.disable()) // 禁用HTTP Basic认证
