@@ -5,10 +5,14 @@ spring:
   application:
     name: finance-dashboard
   datasource:
-    url: jdbc:mysql://localhost:3306/finance_db?useSSL=false&serverTimezone=UTC
+    url: jdbc:mysql://localhost:3306/finance_db?useSSL=false&serverTimezone=UTC&autoReconnect=true
     username: root
     password: 123456
     driver-class-name: com.mysql.cj.jdbc.Driver
+    hikari:
+      auto-commit: true
+      connection-timeout: 30000
+      maximum-pool-size: 10
 
 
 mybatis:
@@ -31,3 +35,11 @@ sina:
     enabled: false  # 是否启用定时任务，初期设为false，测试通过后再开启
     realtime-cron: "0 */1 9-15 * * MON-FRI"  # 交易日9:30-15:00每分钟执行
     history-cron: "0 0 16 * * MON-FRI"  # 每天16:00同步历史数据
+
+# 大模型配置
+llm:
+  provider: openai  # 服务商类型: openai, azure, deepseek, qwen 等
+  api-key: sk-42121017134a3f03ba69f8495a61f018
+  base-url: https://apis.iflow.cn/v1
+  model: qwen3-vl-plus
+  timeout: 60000  # 超时时间(毫秒)

@@ -33,9 +33,9 @@ public class SinaIndustryDTO {
     private String sector;
     
     /**
-     * 总市值（单位：元）
+     * 总市值（单位：亿元）
      */
-    private BigDecimal marketValue;
+    private BigDecimal totalMarketCap;
     
     /**
      * 上市日期

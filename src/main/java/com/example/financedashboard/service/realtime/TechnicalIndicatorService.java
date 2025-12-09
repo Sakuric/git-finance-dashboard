@@ -3,6 +3,7 @@ package com.example.financedashboard.service.realtime;
 import com.example.financedashboard.dto.KLineDTO;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
@@ -14,11 +15,15 @@ import java.util.Map;
 /**
  * 技术指标实时计算服务
  * 基于K线数据实时计算各种技术指标
+ * 所有数据通过API实时计算，不进行数据库持久化
  */
 @Service
 public class TechnicalIndicatorService {
 
     private static final Logger logger = LoggerFactory.getLogger(TechnicalIndicatorService.class);
+
+    @Autowired
+    private StockDataRealtimeService stockDataRealtimeService;
 
     /**
      * 计算所有技术指标
@@ -275,5 +280,48 @@ public class TechnicalIndicatorService {
      */
     public Map<String, Object> getLatestIndicators(List<KLineDTO> klineList) {
         return calculateAllIndicators(klineList);
+    }
+
+    // ==================== API调用方法 ====================
+
+    /**
+     * 为指定股票计算技术指标
+     *
+     * @param stockCode 股票代码
+     * @param days 计算所需的历史天数
+     * @return 技术指标数据
+     */
+    public Map<String, Object> calculateIndicatorsForStock(String stockCode, Integer days) {
+        List<KLineDTO> klineList = stockDataRealtimeService.getStockHistory(stockCode, days);
+        
+        if (klineList.isEmpty()) {
+            logger.warn("股票 {} 没有K线数据", stockCode);
+            return new HashMap<>();
+        }
+        
+        return calculateAllIndicators(klineList);
+    }
+
+    /**
+     * 批量计算多个股票的技术指标
+     *
+     * @param stockCodes 股票代码列表
+     * @param days 计算所需的历史天数
+     * @return 批量技术指标数据
+     */
+    public Map<String, Map<String, Object>> batchCalculateIndicators(List<String> stockCodes, Integer days) {
+        Map<String, Map<String, Object>> result = new HashMap<>();
+        
+        for (String stockCode : stockCodes) {
+            try {
+                Map<String, Object> indicators = calculateIndicatorsForStock(stockCode, days);
+                result.put(stockCode, indicators);
+            } catch (Exception e) {
+                logger.error("计算股票 {} 的技术指标失败", stockCode, e);
+                result.put(stockCode, Map.of("error", e.getMessage()));
+            }
+        }
+        
+        return result;
     }
 }

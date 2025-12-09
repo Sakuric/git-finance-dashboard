@@ -12,6 +12,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 
@@ -179,7 +180,6 @@ public class SinaDataPersistenceService {
 
         // 基础信息
         stockInfo.setStockCode(dto.getStockCode());
-        stockInfo.setStockSymbol(dto.getStockCode());
         stockInfo.setStockName(dto.getStockName());
 
         // 判断交易所
@@ -281,10 +281,9 @@ public class SinaDataPersistenceService {
             String code = stockMap.get("code");
             String name = stockMap.get("name");
 
-            stockInfo.setStockSymbol(code);
+            stockInfo.setStockCode(code);
             stockInfo.setStockName(name);
             stockInfo.setExchange(stockMap.get("exchange"));
-            stockInfo.setStockCode(code);
             
             stockInfo.setStatus(1); // 默认正常交易
             stockInfo.setCreatedAt(LocalDateTime.now());
@@ -292,6 +291,10 @@ public class SinaDataPersistenceService {
 
             stockInfoList.add(stockInfo);
         }
+
+        // 新增排序逻辑：根据股票代码进行排序
+        log.info("根据股票代码排序，确保插入数据库时ID有序...");
+        stockInfoList.sort(Comparator.comparing(StockInfo::getStockCode));
 
         // 3. 批量插入或更新
         if (!stockInfoList.isEmpty()) {
