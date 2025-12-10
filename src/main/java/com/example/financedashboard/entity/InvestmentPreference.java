@@ -16,15 +16,20 @@ import java.time.LocalDateTime;
 @AllArgsConstructor
 @NoArgsConstructor
 public class InvestmentPreference {
-    private Long id;                        // 偏好ID，主键
-    private Long userId;                    // 用户ID，外键关联user_info表，唯一
-    private Integer riskToleranceLevel;     // 风险承受能力：1-保守，2-稳健，3-平衡，4-积极，5-激进
-    private String investmentHorizon;       // 投资期限：短期/中期/长期
-    private BigDecimal capitalAmount;       // 投资金额
-    private String preferredAssetClasses;   // 偏好资产类别
-    private String preferredIndustry;       // 偏好行业
-    private BigDecimal minExpectedReturn;   // 最低预期收益率(%)
-    private BigDecimal maxAcceptableLoss;   // 最大可接受亏损(%)
-    private LocalDateTime createdAt;        // 创建时间
-    private LocalDateTime updatedAt;        // 更新时间
+    private Long id;
+    private Long userId;
+    private Integer riskToleranceLevel;
+    private String investmentHorizonType;
+    private String investmentHorizonPreset;
+    private Integer investmentHorizonCustomDays;
+    private Integer investmentHorizonCustomMonths;
+    private Integer investmentHorizonCustomYears;
+    private String investmentHorizonDisplay;
+    private BigDecimal capitalAmount;
+    private String preferredAssetClasses;
+    private String preferredIndustry;
+    private BigDecimal minExpectedReturn;
+    private BigDecimal maxAcceptableLoss;
+    private LocalDateTime createdAt;
+    private LocalDateTime updatedAt;
 }
