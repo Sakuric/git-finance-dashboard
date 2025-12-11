@@ -48,7 +48,8 @@ public class SecurityConfig {
                         .requestMatchers("/api/llm/**").permitAll() // 允许访问大模型接口
                         .requestMatchers("/api/ai-models/**").permitAll() // 允许访问AI模型配置接口
                         .requestMatchers("/api/investment-preference/**").permitAll() // 允许访问投资偏好接口
-                        .requestMatchers("/api/favorites/**").permitAll()
+                        .requestMatchers("/api/favorites/**").permitAll()//允许访问用户偏好接口
+                        .requestMatchers("/api/advice/**").permitAll()//允许访问投资建议接口
                         .requestMatchers("/error").permitAll() // 允许访问错误页面
                         .anyRequest().authenticated())
                 .httpBasic(httpBasic -> httpBasic.disable()) // 禁用HTTP Basic认证
