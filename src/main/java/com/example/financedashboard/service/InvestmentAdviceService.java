@@ -75,33 +75,67 @@ public class InvestmentAdviceService {
 
     private String buildPrompt(InvestmentPreference preference, List<StockInfo> stocks) {
         StringBuilder prompt = new StringBuilder();
-        prompt.append("当前时间：2025年12月。请基于2025年最新的市场环境、政策和行业动态生成投资建议。\n\n");
+        prompt.append("# 投资建议生成任务\n\n");
+        prompt.append("**当前时间**: 2025年12月\n");
+        prompt.append("**要求**: 请基于以下提供的最新资讯（多源聚合，3小时内更新）生成全面、深入的投资建议分析。\n\n");
+
+        prompt.append("---\n\n");
+        prompt.append("## 一、最新市场资讯（四大维度·多源聚合）\n\n");
+        prompt.append("*数据来源: 新浪财经 + 东方财富 等多个权威财经平台*\n\n");
 
         List<String> stockCodes = stocks.stream().map(StockInfo::getStockCode).collect(Collectors.toList());
-        prompt.append(newsService.getLatestNews(stockCodes, preference.getPreferredIndustry())).append("\n\n");
+        String newsContent = newsService.getLatestNews(stockCodes, preference.getPreferredIndustry());
+        prompt.append(newsContent).append("\n");
 
-        prompt.append("请根据以上最新资讯和以下用户投资偏好、自选股列表，生成分层级的投资建议。\n\n");
+        prompt.append("---\n\n");
+        prompt.append("## 二、用户投资画像\n\n");
+        prompt.append("| 维度 | 详情 |\n");
+        prompt.append("|------|------|\n");
+        prompt.append("| 风险承受能力 | ").append(getRiskLevelText(preference.getRiskToleranceLevel())).append(" |\n");
+        prompt.append("| 投资期限 | ").append(preference.getInvestmentHorizonDisplay()).append(" |\n");
+        prompt.append("| 偏好行业 | ").append(preference.getPreferredIndustry()).append(" |\n\n");
 
-        prompt.append("用户投资偏好：\n");
-        prompt.append("- 风险承受能力：").append(getRiskLevelText(preference.getRiskToleranceLevel())).append("\n");
-        prompt.append("- 投资期限：").append(preference.getInvestmentHorizonDisplay()).append("\n");
-        prompt.append("- 偏好行业：").append(preference.getPreferredIndustry()).append("\n\n");
-
-        prompt.append("自选股列表：\n");
-        for (StockInfo stock : stocks) {
-            prompt.append("- ").append(stock.getStockName())
-                    .append("(").append(stock.getStockCode()).append(")")
-                    .append(" - ").append(stock.getIndustry()).append("\n");
+        prompt.append("## 三、自选股池\n\n");
+        for (int i = 0; i < stocks.size(); i++) {
+            StockInfo stock = stocks.get(i);
+            prompt.append(String.format("%d. **%s** (%s) - %s\n",
+                i + 1, stock.getStockName(), stock.getStockCode(), stock.getIndustry()));
         }
 
-        prompt.append("\n请按以下JSON格式返回分层分析：\n");
+        prompt.append("\n---\n\n");
+        prompt.append("## 四、输出要求\n\n");
+        prompt.append("请基于以上**四大维度的最新资讯**（国际形势、国家政策、行业动态、个股新闻），");
+        prompt.append("结合用户投资画像和自选股池，生成结构化的投资建议。\n\n");
+        prompt.append("**必须严格按照以下JSON格式返回**：\n\n");
+        prompt.append("```json\n");
         prompt.append("{\n");
-        prompt.append("  \"worldSituation\": {\"title\": \"世界形势\", \"content\": \"全球经济和地缘政治分析\"},\n");
-        prompt.append("  \"nationalPolicy\": {\"title\": \"国家政策\", \"content\": \"国内政策和监管环境分析\"},\n");
-        prompt.append("  \"industryTrends\": {\"title\": \"行业趋势\", \"content\": \"相关行业发展趋势分析\"},\n");
-        prompt.append("  \"companyOverview\": {\"title\": \"公司概况\", \"content\": \"各公司具体分析\"},\n");
-        prompt.append("  \"recommendations\": [{\"code\": \"股票代码\", \"name\": \"股票名称\", \"suggestedAction\": \"买入/持有/卖出\", \"thesis\": \"投资理由\", \"entryPrice\": \"建议价格\"}]\n");
+        prompt.append("  \"worldSituation\": {\n");
+        prompt.append("    \"title\": \"世界形势分析\",\n");
+        prompt.append("    \"content\": \"基于上述国际财经资讯，深入分析全球经济走势、地缘政治风险、主要经济体政策对A股市场的影响\"\n");
+        prompt.append("  },\n");
+        prompt.append("  \"nationalPolicy\": {\n");
+        prompt.append("    \"title\": \"国家政策解读\",\n");
+        prompt.append("    \"content\": \"基于上述国家政策资讯，分析最新财政、货币、产业政策对相关行业和个股的影响\"\n");
+        prompt.append("  },\n");
+        prompt.append("  \"industryTrends\": {\n");
+        prompt.append("    \"title\": \"行业趋势研判\",\n");
+        prompt.append("    \"content\": \"基于上述行业动态资讯，分析用户偏好行业及自选股所在行业的发展趋势、竞争格局、投资机会\"\n");
+        prompt.append("  },\n");
+        prompt.append("  \"companyOverview\": {\n");
+        prompt.append("    \"title\": \"个股深度分析\",\n");
+        prompt.append("    \"content\": \"基于上述个股新闻，逐一分析自选股的最新动态、基本面变化、风险因素\"\n");
+        prompt.append("  },\n");
+        prompt.append("  \"recommendations\": [\n");
+        prompt.append("    {\n");
+        prompt.append("      \"code\": \"股票代码\",\n");
+        prompt.append("      \"name\": \"股票名称\",\n");
+        prompt.append("      \"suggestedAction\": \"买入/持有/卖出\",\n");
+        prompt.append("      \"thesis\": \"综合四大维度资讯的投资逻辑和理由\",\n");
+        prompt.append("      \"entryPrice\": \"建议操作价格区间\"\n");
+        prompt.append("    }\n");
+        prompt.append("  ]\n");
         prompt.append("}\n");
+        prompt.append("```\n");
 
         return prompt.toString();
     }
