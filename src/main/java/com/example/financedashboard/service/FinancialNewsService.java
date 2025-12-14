@@ -10,9 +10,10 @@ import okhttp3.Request;
 import okhttp3.Response;
 import org.springframework.stereotype.Service;
 
-import java.util.List;
+import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
 
 @Slf4j
 @Service
@@ -47,24 +48,100 @@ public class FinancialNewsService {
     }
 
     private String fetchGlobalNewsMultiSource() {
-        StringBuilder result = new StringBuilder();
-        result.append(fetchGlobalNews());
-        result.append(fetchFromEastMoney("global"));
-        return result.toString();
+        List<String> allNews = new ArrayList<>();
+        allNews.addAll(fetchAllNews("https://finance.sina.com.cn/roll/index.d.html?cid=56506&page=1", 30));
+        allNews.addAll(fetchAllNews("https://finance.eastmoney.com/a/cgjjxw.html", 30));
+
+        return filterByKeywords(allNews,
+            List.of("美联储", "美国", "欧洲", "欧央行", "日本", "日央行", "英国", "全球", "国际", "IMF", "世界银行", "G20", "OPEC", "WTO"),
+            "国际形势", 10);
     }
 
     private String fetchNationalNewsMultiSource() {
-        StringBuilder result = new StringBuilder();
-        result.append(fetchNationalNews());
-        result.append(fetchFromEastMoney("policy"));
-        return result.toString();
+        List<String> allNews = new ArrayList<>();
+        allNews.addAll(fetchAllNews("https://finance.sina.com.cn/roll/index.d.html?cid=56507&page=1", 30));
+        allNews.addAll(fetchAllNews("https://finance.eastmoney.com/a/ccjpl.html", 30));
+
+        return filterByKeywords(allNews,
+            List.of("央行", "财政部", "发改委", "工信部", "证监会", "银保监", "国务院", "政策", "降息", "降准", "减税", "补贴", "监管", "改革"),
+            "国家政策", 10);
     }
 
     private String fetchIndustryNewsMultiSource(String industries) {
-        StringBuilder result = new StringBuilder();
-        result.append(fetchIndustryNews(industries));
-        result.append(fetchFromEastMoney("industry"));
-        return result.toString();
+        List<String> allNews = new ArrayList<>();
+        allNews.addAll(fetchAllNews("https://finance.sina.com.cn/roll/index.d.html?cid=56516&page=1", 30));
+        allNews.addAll(fetchAllNews("https://finance.eastmoney.com/a/chyjj.html", 30));
+
+        List<String> keywords = new ArrayList<>(List.of("芯片", "半导体", "新能源", "汽车", "AI", "人工智能", "医药", "地产", "银行", "保险", "消费", "科技"));
+        if (industries != null && !industries.isEmpty()) {
+            keywords.addAll(List.of(industries.split("[,，]")));
+        }
+
+        return filterByKeywords(allNews, keywords, "行业动态", 12);
+    }
+
+    private List<String> fetchAllNews(String url, int limit) {
+        List<String> news = new ArrayList<>();
+        Request request = new Request.Builder()
+                .url(url)
+                .addHeader("User-Agent", "Mozilla/5.0")
+                .build();
+
+        try (Response response = httpClient.newCall(request).execute()) {
+            if (!response.isSuccessful() || response.body() == null) return news;
+
+            String html = response.body().string();
+            String[] lines = html.split("<li>");
+            int found = 0;
+
+            for (String line : lines) {
+                if (found >= limit) break;
+                if (line.contains("<a href=") && line.contains("</a>")) {
+                    try {
+                        int start = line.indexOf(">", line.indexOf("<a")) + 1;
+                        int end = line.indexOf("</a>");
+                        if (start > 0 && end > start && end < line.length()) {
+                            String title = line.substring(start, end)
+                                    .replaceAll("<[^>]+>", "")
+                                    .replaceAll("&nbsp;", " ")
+                                    .replaceAll("&quot;", "\"")
+                                    .replaceAll("&amp;", "&")
+                                    .trim();
+                            if (!title.isEmpty() && title.length() > 5 && title.length() < 200) {
+                                news.add(title);
+                                found++;
+                            }
+                        }
+                    } catch (Exception e) {
+                        log.debug("解析新闻失败", e);
+                    }
+                }
+            }
+        } catch (Exception e) {
+            log.debug("获取新闻失败: {}", url, e);
+        }
+
+        return news;
+    }
+
+    private String filterByKeywords(List<String> allNews, List<String> keywords, String category, int targetCount) {
+        Map<String, Integer> matched = new LinkedHashMap<>();
+
+        for (String news : allNews) {
+            for (String keyword : keywords) {
+                if (news.contains(keyword)) {
+                    matched.putIfAbsent(news, 1);
+                    break;
+                }
+            }
+            if (matched.size() >= targetCount) break;
+        }
+
+        if (matched.isEmpty()) {
+            return allNews.stream().limit(targetCount).map(n -> "- " + n + "\n").collect(Collectors.joining());
+        }
+
+        return matched.keySet().stream().map(n -> "- " + n + "\n").collect(Collectors.joining());
     }
 
     private String fetchStockNewsMultiSource(List<String> stockCodes) {
@@ -78,108 +155,6 @@ public class FinancialNewsService {
         return result.toString();
     }
 
-    private String fetchFromEastMoney(String category) {
-        String url = switch (category) {
-            case "global" -> "https://finance.eastmoney.com/a/cgjjxw.html";
-            case "policy" -> "https://finance.eastmoney.com/a/ccjpl.html";
-            case "industry" -> "https://finance.eastmoney.com/a/chyjj.html";
-            default -> "";
-        };
-
-        if (url.isEmpty()) return "";
-
-        Request request = new Request.Builder()
-                .url(url)
-                .addHeader("User-Agent", "Mozilla/5.0")
-                .build();
-
-        try (Response response = httpClient.newCall(request).execute()) {
-            if (!response.isSuccessful() || response.body() == null) return "";
-            return parseNewsFromHtml(response.body().string(), 5);
-        } catch (Exception e) {
-            log.debug("东方财富{}资讯获取失败", category, e);
-            return "";
-        }
-    }
-
-    private String fetchGlobalNews() {
-        Request request = new Request.Builder()
-                .url("https://finance.sina.com.cn/roll/index.d.html?cid=56506&page=1")
-                .addHeader("User-Agent", "Mozilla/5.0")
-                .build();
-
-        try (Response response = httpClient.newCall(request).execute()) {
-            if (!response.isSuccessful() || response.body() == null) return "暂无最新国际财经资讯";
-            return parseNewsFromHtml(response.body().string(), 8);
-        } catch (Exception e) {
-            log.error("获取国际形势新闻失败", e);
-            return "暂无最新国际财经资讯";
-        }
-    }
-
-    private String fetchNationalNews() {
-        Request request = new Request.Builder()
-                .url("https://finance.sina.com.cn/roll/index.d.html?cid=56507&page=1")
-                .addHeader("User-Agent", "Mozilla/5.0")
-                .build();
-
-        try (Response response = httpClient.newCall(request).execute()) {
-            if (!response.isSuccessful() || response.body() == null) return "暂无最新国家政策资讯";
-            return parseNewsFromHtml(response.body().string(), 8);
-        } catch (Exception e) {
-            log.error("获取国家政策新闻失败", e);
-            return "暂无最新国家政策资讯";
-        }
-    }
-
-    private String fetchIndustryNews(String industries) {
-        Request request = new Request.Builder()
-                .url("https://finance.sina.com.cn/roll/index.d.html?cid=56516&page=1")
-                .addHeader("User-Agent", "Mozilla/5.0")
-                .build();
-
-        try (Response response = httpClient.newCall(request).execute()) {
-            if (!response.isSuccessful() || response.body() == null) return "暂无最新行业动态资讯";
-            return parseNewsFromHtml(response.body().string(), 10);
-        } catch (Exception e) {
-            log.error("获取行业动态新闻失败", e);
-            return "暂无最新行业动态资讯";
-        }
-    }
-
-    private String parseNewsFromHtml(String html, int count) {
-        StringBuilder result = new StringBuilder();
-        if (html == null || html.isEmpty()) {
-            return "暂无\n";
-        }
-
-        String[] lines = html.split("<li>");
-        int found = 0;
-        for (String line : lines) {
-            if (found >= count) break;
-            if (line.contains("<a href=") && line.contains("</a>")) {
-                try {
-                    int start = line.indexOf(">", line.indexOf("<a")) + 1;
-                    int end = line.indexOf("</a>");
-                    if (start > 0 && end > start && end < line.length()) {
-                        String title = line.substring(start, end)
-                                .replaceAll("<[^>]+>", "")
-                                .replaceAll("&nbsp;", " ")
-                                .replaceAll("&quot;", "\"")
-                                .replaceAll("&amp;", "&")
-                                .trim();
-                        if (!title.isEmpty() && title.length() > 5 && title.length() < 200) {
-                            result.append("- ").append(title).append("\n");
-                            found++;
-                        }
-                    }
-                } catch (Exception e) {
-                    log.debug("解析新闻标题失败，跳过该条", e);
-                }
-            }
-        }
-        return result.length() > 0 ? result.toString() : "暂无\n";
-    }
 
     private String fetchStockNews(String stockCode) {
         String cleanCode = stockCode.replace("sh", "").replace("sz", "");
