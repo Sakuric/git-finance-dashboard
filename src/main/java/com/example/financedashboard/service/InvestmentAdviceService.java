@@ -112,11 +112,13 @@ public class InvestmentAdviceService {
         prompt.append("| 投资期限 | ").append(preference.getInvestmentHorizonDisplay()).append(" |\n");
         prompt.append("| 偏好行业 | ").append(preference.getPreferredIndustry()).append(" |\n\n");
 
-        prompt.append("## 三、自选股池\n\n");
+        prompt.append("## 三、自选股池（含当前价格）\n\n");
         for (int i = 0; i < stocks.size(); i++) {
             StockInfo stock = stocks.get(i);
-            prompt.append(String.format("%d. **%s** (%s) - %s\n",
-                i + 1, stock.getStockName(), stock.getStockCode(), stock.getIndustry()));
+            prompt.append(String.format("%d. **%s** (%s) - %s | 当前价: %.2f元 | 涨跌幅: %.2f%%\n",
+                i + 1, stock.getStockName(), stock.getStockCode(), stock.getIndustry(),
+                stock.getCurrentPrice() != null ? stock.getCurrentPrice() : 0.0,
+                stock.getChangePercent() != null ? stock.getChangePercent() : 0.0));
         }
 
         prompt.append("\n---\n\n");
@@ -161,6 +163,11 @@ public class InvestmentAdviceService {
         prompt.append("2. 对于不建议投资的股票，设置suggestedAction为NOT_RECOMMENDED，并在thesis中详细说明原因\n");
         prompt.append("3. 价格字段必须是纯数字，不要包含单位或货币符号\n");
         prompt.append("4. 对于BUY操作，必须提供所有价格字段；对于NOT_RECOMMENDED，价格字段可为null\n");
+        prompt.append("5. **关键要求**：建议的买入价格区间、止盈价格、止损价格必须基于股票的**当前价格**进行合理设置\n");
+        prompt.append("   - 买入价格区间应该在当前价格附近（如当前价±5-10%）\n");
+        prompt.append("   - 止盈价格应该高于当前价格（如当前价+15-30%）\n");
+        prompt.append("   - 止损价格应该低于当前价格（如当前价-10-15%）\n");
+        prompt.append("   - 价格设置要符合技术分析和风险管理原则\n");
 
         return prompt.toString();
     }

@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.example.financedashboard.mapper.StockBacktestDetailMapper">
+
+    <resultMap id="BaseResultMap" type="com.example.financedashboard.entity.StockBacktestDetail">
+        <id column="id" property="id"/>
+        <result column="backtest_id" property="backtestId"/>
+        <result column="advice_id" property="adviceId"/>
+        <result column="stock_code" property="stockCode"/>
+        <result column="stock_name" property="stockName"/>
+        <result column="suggested_action" property="suggestedAction"/>
+        <result column="total_return" property="totalReturn"/>
+        <result column="max_drawdown" property="maxDrawdown"/>
+        <result column="trade_count" property="tradeCount"/>
+        <result column="win_count" property="winCount"/>
+        <result column="entry_price" property="entryPrice"/>
+        <result column="exit_price" property="exitPrice"/>
+        <result column="exit_reason" property="exitReason"/>
+        <result column="no_trade_reason" property="noTradeReason"/>
+        <result column="created_at" property="createdAt"/>
+    </resultMap>
+
+    <insert id="insert" parameterType="com.example.financedashboard.entity.StockBacktestDetail" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO stock_backtest_detail (
+            backtest_id, advice_id, stock_code, stock_name, suggested_action,
+            total_return, max_drawdown, trade_count, win_count,
+            entry_price, exit_price, exit_reason, no_trade_reason
+        ) VALUES (
+            #{backtestId}, #{adviceId}, #{stockCode}, #{stockName}, #{suggestedAction},
+            #{totalReturn}, #{maxDrawdown}, #{tradeCount}, #{winCount},
+            #{entryPrice}, #{exitPrice}, #{exitReason}, #{noTradeReason}
+        )
+    </insert>
+
+    <insert id="batchInsert" parameterType="java.util.List">
+        INSERT INTO stock_backtest_detail (
+            backtest_id, advice_id, stock_code, stock_name, suggested_action,
+            total_return, max_drawdown, trade_count, win_count,
+            entry_price, exit_price, exit_reason, no_trade_reason
+        ) VALUES
+        <foreach collection="list" item="item" separator=",">
+            (#{item.backtestId}, #{item.adviceId}, #{item.stockCode}, #{item.stockName}, #{item.suggestedAction},
+             #{item.totalReturn}, #{item.maxDrawdown}, #{item.tradeCount}, #{item.winCount},
+             #{item.entryPrice}, #{item.exitPrice}, #{item.exitReason}, #{item.noTradeReason})
+        </foreach>
+    </insert>
+
+    <select id="findByBacktestId" resultMap="BaseResultMap">
+        SELECT * FROM stock_backtest_detail WHERE backtest_id = #{backtestId} ORDER BY id
+    </select>
+
+    <select id="findByAdviceId" resultMap="BaseResultMap">
+        SELECT * FROM stock_backtest_detail WHERE advice_id = #{adviceId} ORDER BY id
+    </select>
+
+</mapper>

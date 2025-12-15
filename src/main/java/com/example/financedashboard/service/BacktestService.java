@@ -1,12 +1,7 @@
 package com.example.financedashboard.service;
 
-import com.example.financedashboard.entity.BacktestResult;
-import com.example.financedashboard.entity.InvestmentAdvice;
-import com.example.financedashboard.entity.StockHistory;
-import com.example.financedashboard.entity.StructuredAdvice;
-import com.example.financedashboard.mapper.BacktestResultMapper;
-import com.example.financedashboard.mapper.StockHistoryMapper;
-import com.example.financedashboard.mapper.StructuredAdviceMapper;
+import com.example.financedashboard.entity.*;
+import com.example.financedashboard.mapper.*;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -24,6 +19,7 @@ public class BacktestService {
     private final BacktestResultMapper backtestMapper;
     private final StockHistoryMapper stockHistoryMapper;
     private final StructuredAdviceMapper structuredAdviceMapper;
+    private final StockBacktestDetailMapper detailMapper;
 
     private static final BigDecimal INITIAL_CASH = new BigDecimal("1000000");
     private static final BigDecimal POSITION_SIZE_RATIO = new BigDecimal("0.10");
@@ -38,124 +34,182 @@ public class BacktestService {
         result.setBacktestEndDate(endDate);
         result.setBacktestDuration(180);
 
-        try {
-            List<StructuredAdvice> advices = structuredAdviceMapper.findByAdviceId(advice.getId());
-            if (advices.isEmpty()) {
-                log.warn("没有找到结构化建议，使用默认值");
-                setDefaultValues(result);
-                backtestMapper.insert(result);
-                return result;
-            }
-
-            SimulationResult simulation = runSimulation(advices, startDate, endDate);
-
-            result.setTotalReturn(simulation.totalReturn);
-            result.setAnnualizedReturn(simulation.totalReturn.multiply(new BigDecimal("2")));
-            result.setMaxDrawdown(simulation.maxDrawdown);
-            result.setSharpeRatio(simulation.sharpeRatio);
-            result.setWinRate(simulation.winRate);
-            result.setVolatility(simulation.volatility);
-            result.setIsSuccess(simulation.totalReturn.compareTo(BigDecimal.ZERO) > 0 ? 1 : 0);
-            result.setFailureReason("基于具体买卖价位的回测结果，仅供参考");
-
-            log.info("回测完成，建议ID: {}, 收益率: {}%", advice.getId(), simulation.totalReturn);
-        } catch (Exception e) {
-            log.error("回测失败", e);
+        List<StructuredAdvice> advices = structuredAdviceMapper.findByAdviceId(advice.getId());
+        if (advices.isEmpty()) {
             setDefaultValues(result);
+            backtestMapper.insert(result);
+            return result;
         }
 
+        SimulationResult simulation = runSimulation(advices, startDate, endDate);
+
+        result.setTotalReturn(simulation.totalReturn);
+        result.setAnnualizedReturn(simulation.totalReturn.multiply(new BigDecimal("2")));
+        result.setMaxDrawdown(simulation.maxDrawdown);
+        result.setSharpeRatio(simulation.sharpeRatio);
+        result.setWinRate(simulation.winRate);
+        result.setVolatility(simulation.volatility);
+        result.setIsSuccess(simulation.totalReturn.compareTo(BigDecimal.ZERO) > 0 ? 1 : 0);
+        result.setFailureReason("基于具体买卖价位的回测结果，仅供参考");
+
         backtestMapper.insert(result);
+        saveStockDetails(result.getId(), advice.getId(), advices, simulation.stockDetails);
+
         return result;
     }
 
     private SimulationResult runSimulation(List<StructuredAdvice> advices, LocalDate startDate, LocalDate endDate) {
-        Portfolio portfolio = new Portfolio(INITIAL_CASH, stockHistoryMapper);
+        Map<String, StockDetail> stockDetails = new HashMap<>();
+        BigDecimal cash = INITIAL_CASH;
+        Map<String, Position> positions = new HashMap<>();
         List<BigDecimal> dailyValues = new ArrayList<>();
         Map<String, Integer> tradeResults = new HashMap<>();
 
-        List<StructuredAdvice> buyAdvices = new ArrayList<>();
         for (StructuredAdvice advice : advices) {
-            if ("BUY".equals(advice.getSuggestedAction())) {
-                buyAdvices.add(advice);
-            }
+            stockDetails.put(advice.getStockCode(), new StockDetail());
         }
 
         for (LocalDate date = startDate; !date.isAfter(endDate); date = date.plusDays(1)) {
-            LocalDate currentDate = date;
+            for (StructuredAdvice advice : advices) {
+                if (!"BUY".equals(advice.getSuggestedAction())) continue;
 
-            for (StructuredAdvice advice : buyAdvices) {
-                if (portfolio.hasPosition(advice.getStockCode())) {
-                    checkSellSignals(portfolio, advice, currentDate, tradeResults);
+                StockDetail detail = stockDetails.get(advice.getStockCode());
+                List<StockHistory> history = stockHistoryMapper.findByStockCodeAndDateRange(advice.getStockCode(), date, date);
+                if (history.isEmpty()) continue;
+
+                StockHistory todayData = history.get(0);
+
+                if (positions.containsKey(advice.getStockCode())) {
+                    Position pos = positions.get(advice.getStockCode());
+                    boolean shouldSell = false;
+                    BigDecimal sellPrice = todayData.getClosePrice();
+                    String exitReason = null;
+
+                    if (advice.getStopLossPrice() != null && todayData.getLowPrice().compareTo(advice.getStopLossPrice()) <= 0) {
+                        sellPrice = advice.getStopLossPrice();
+                        shouldSell = true;
+                        exitReason = "STOP_LOSS";
+                    } else if (advice.getTakeProfitPrice() != null && todayData.getHighPrice().compareTo(advice.getTakeProfitPrice()) >= 0) {
+                        sellPrice = advice.getTakeProfitPrice();
+                        shouldSell = true;
+                        exitReason = "TAKE_PROFIT";
+                    }
+
+                    if (shouldSell) {
+                        cash = cash.add(sellPrice.multiply(new BigDecimal(pos.shares)));
+                        BigDecimal profit = sellPrice.subtract(pos.buyPrice).multiply(new BigDecimal(pos.shares));
+
+                        detail.exitPrice = sellPrice;
+                        detail.exitReason = exitReason;
+                        detail.totalReturn = sellPrice.subtract(pos.buyPrice).divide(pos.buyPrice, 4, RoundingMode.HALF_UP).multiply(new BigDecimal("100"));
+                        detail.tradeCount++;
+                        if (profit.compareTo(BigDecimal.ZERO) > 0) {
+                            detail.winCount++;
+                            tradeResults.put("win", tradeResults.getOrDefault("win", 0) + 1);
+                        } else {
+                            tradeResults.put("loss", tradeResults.getOrDefault("loss", 0) + 1);
+                        }
+
+                        positions.remove(advice.getStockCode());
+                    }
                 } else {
-                    checkBuySignals(portfolio, advice, currentDate, startDate);
+                    if (advice.getEntryPriceStart() == null || advice.getEntryPriceEnd() == null) continue;
+                    if (date.isAfter(startDate.plusDays(advice.getAdviceEffectiveDays() != null ? advice.getAdviceEffectiveDays() : 180))) continue;
+
+                    if (todayData.getLowPrice().compareTo(advice.getEntryPriceEnd()) <= 0 &&
+                        todayData.getHighPrice().compareTo(advice.getEntryPriceStart()) >= 0) {
+
+                        BigDecimal buyPrice = advice.getEntryPriceEnd();
+                        BigDecimal positionSize = cash.multiply(POSITION_SIZE_RATIO);
+                        int shares = positionSize.divide(buyPrice, 0, RoundingMode.DOWN).intValue();
+
+                        if (shares > 0) {
+                            cash = cash.subtract(buyPrice.multiply(new BigDecimal(shares)));
+                            positions.put(advice.getStockCode(), new Position(shares, buyPrice, date));
+                            detail.entryPrice = buyPrice;
+                        }
+                    }
                 }
             }
 
-            BigDecimal dailyValue = portfolio.calculateTotalValue(currentDate);
-            dailyValues.add(dailyValue);
+            BigDecimal totalValue = cash;
+            for (Map.Entry<String, Position> entry : positions.entrySet()) {
+                BigDecimal currentPrice = getCurrentPrice(entry.getKey(), date);
+                totalValue = totalValue.add(currentPrice.multiply(new BigDecimal(entry.getValue().shares)));
+            }
+            dailyValues.add(totalValue);
         }
 
-        portfolio.closeAllPositions(endDate, tradeResults);
+        for (String stockCode : new HashSet<>(positions.keySet())) {
+            Position pos = positions.get(stockCode);
+            BigDecimal closePrice = getCurrentPrice(stockCode, endDate);
+            cash = cash.add(closePrice.multiply(new BigDecimal(pos.shares)));
 
-        return calculateMetrics(dailyValues, tradeResults, INITIAL_CASH);
-    }
+            StockDetail detail = stockDetails.get(stockCode);
+            if (detail.entryPrice != null) {
+                detail.exitPrice = closePrice;
+                detail.exitReason = "END_OF_PERIOD";
+                detail.totalReturn = closePrice.subtract(pos.buyPrice).divide(pos.buyPrice, 4, RoundingMode.HALF_UP).multiply(new BigDecimal("100"));
+                detail.tradeCount++;
 
-    private void checkBuySignals(Portfolio portfolio, StructuredAdvice advice, LocalDate currentDate, LocalDate adviceDate) {
-        if (advice.getEntryPriceStart() == null || advice.getEntryPriceEnd() == null) return;
-
-        Integer effectiveDays = advice.getAdviceEffectiveDays() != null ? advice.getAdviceEffectiveDays() : 180;
-        if (currentDate.isAfter(adviceDate.plusDays(effectiveDays))) return;
-
-        List<StockHistory> history = stockHistoryMapper.findByStockCodeAndDateRange(
-            advice.getStockCode(), currentDate, currentDate);
-
-        if (history.isEmpty()) return;
-
-        StockHistory todayData = history.get(0);
-        if (todayData.getLowPrice().compareTo(advice.getEntryPriceEnd()) <= 0 &&
-            todayData.getHighPrice().compareTo(advice.getEntryPriceStart()) >= 0) {
-
-            BigDecimal buyPrice = advice.getEntryPriceEnd();
-            BigDecimal positionSize = portfolio.cash.multiply(POSITION_SIZE_RATIO);
-            int shares = positionSize.divide(buyPrice, 0, RoundingMode.DOWN).intValue();
-
-            if (shares > 0) {
-                BigDecimal cost = buyPrice.multiply(new BigDecimal(shares));
-                portfolio.buy(advice.getStockCode(), shares, buyPrice, currentDate);
-                log.debug("买入: {} 股票代码={}, 价格={}, 股数={}", currentDate, advice.getStockCode(), buyPrice, shares);
+                BigDecimal profit = closePrice.subtract(pos.buyPrice).multiply(new BigDecimal(pos.shares));
+                if (profit.compareTo(BigDecimal.ZERO) > 0) {
+                    detail.winCount++;
+                    tradeResults.put("win", tradeResults.getOrDefault("win", 0) + 1);
+                } else {
+                    tradeResults.put("loss", tradeResults.getOrDefault("loss", 0) + 1);
+                }
             }
         }
+
+        SimulationResult result = calculateMetrics(dailyValues, tradeResults, INITIAL_CASH);
+        result.stockDetails = stockDetails;
+        return result;
     }
 
-    private void checkSellSignals(Portfolio portfolio, StructuredAdvice advice, LocalDate currentDate, Map<String, Integer> tradeResults) {
-        Position position = portfolio.getPosition(advice.getStockCode());
-        if (position == null) return;
+    private BigDecimal getCurrentPrice(String stockCode, LocalDate date) {
+        for (int i = 0; i < 10; i++) {
+            List<StockHistory> history = stockHistoryMapper.findByStockCodeAndDateRange(stockCode, date.minusDays(i), date.minusDays(i));
+            if (!history.isEmpty()) return history.get(0).getClosePrice();
+        }
+        return BigDecimal.ONE;
+    }
 
-        List<StockHistory> history = stockHistoryMapper.findByStockCodeAndDateRange(
-            advice.getStockCode(), currentDate, currentDate);
+    private void saveStockDetails(Long backtestId, Long adviceId, List<StructuredAdvice> advices, Map<String, StockDetail> stockDetails) {
+        List<StockBacktestDetail> details = new ArrayList<>();
 
-        if (history.isEmpty()) return;
+        for (StructuredAdvice advice : advices) {
+            StockBacktestDetail detail = new StockBacktestDetail();
+            detail.setBacktestId(backtestId);
+            detail.setAdviceId(adviceId);
+            detail.setStockCode(advice.getStockCode());
+            detail.setStockName(advice.getStockName());
+            detail.setSuggestedAction(advice.getSuggestedAction());
 
-        StockHistory todayData = history.get(0);
-        boolean shouldSell = false;
-        BigDecimal sellPrice = todayData.getClosePrice();
+            StockDetail sd = stockDetails.get(advice.getStockCode());
+            if (sd != null && sd.entryPrice != null) {
+                detail.setTotalReturn(sd.totalReturn);
+                detail.setTradeCount(sd.tradeCount);
+                detail.setWinCount(sd.winCount);
+                detail.setEntryPrice(sd.entryPrice);
+                detail.setExitPrice(sd.exitPrice);
+                detail.setExitReason(sd.exitReason);
+            } else {
+                if ("NOT_RECOMMENDED".equals(advice.getSuggestedAction())) {
+                    detail.setNoTradeReason("不建议投资");
+                } else if ("HOLD".equals(advice.getSuggestedAction())) {
+                    detail.setNoTradeReason("持有观望，无交易策略");
+                } else if ("BUY".equals(advice.getSuggestedAction())) {
+                    detail.setNoTradeReason("价格未触及买入区间");
+                }
+            }
 
-        if (advice.getStopLossPrice() != null && todayData.getLowPrice().compareTo(advice.getStopLossPrice()) <= 0) {
-            sellPrice = advice.getStopLossPrice();
-            shouldSell = true;
-            log.debug("触发止损: {} 股票代码={}, 价格={}", currentDate, advice.getStockCode(), sellPrice);
-        } else if (advice.getTakeProfitPrice() != null && todayData.getHighPrice().compareTo(advice.getTakeProfitPrice()) >= 0) {
-            sellPrice = advice.getTakeProfitPrice();
-            shouldSell = true;
-            log.debug("触发止盈: {} 股票代码={}, 价格={}", currentDate, advice.getStockCode(), sellPrice);
+            details.add(detail);
         }
 
-        if (shouldSell) {
-            BigDecimal profit = sellPrice.subtract(position.buyPrice).multiply(new BigDecimal(position.shares));
-            portfolio.sell(advice.getStockCode(), sellPrice);
-
-            String key = profit.compareTo(BigDecimal.ZERO) > 0 ? "win" : "loss";
-            tradeResults.put(key, tradeResults.getOrDefault(key, 0) + 1);
+        if (!details.isEmpty()) {
+            detailMapper.batchInsert(details);
+            log.info("保存了{}只股票的回测详情", details.size());
         }
     }
 
@@ -163,19 +217,14 @@ public class BacktestService {
         SimulationResult result = new SimulationResult();
 
         BigDecimal finalValue = dailyValues.get(dailyValues.size() - 1);
-        result.totalReturn = finalValue.subtract(initialCash)
-            .divide(initialCash, 4, RoundingMode.HALF_UP)
-            .multiply(new BigDecimal("100"));
-
+        result.totalReturn = finalValue.subtract(initialCash).divide(initialCash, 4, RoundingMode.HALF_UP).multiply(new BigDecimal("100"));
         result.maxDrawdown = calculateMaxDrawdown(dailyValues);
         result.volatility = calculateVolatility(dailyValues);
         result.sharpeRatio = calculateSharpeRatio(result.totalReturn, result.volatility);
 
         int totalTrades = tradeResults.getOrDefault("win", 0) + tradeResults.getOrDefault("loss", 0);
         result.winRate = totalTrades > 0
-            ? new BigDecimal(tradeResults.getOrDefault("win", 0))
-                .divide(new BigDecimal(totalTrades), 4, RoundingMode.HALF_UP)
-                .multiply(new BigDecimal("100"))
+            ? new BigDecimal(tradeResults.getOrDefault("win", 0)).divide(new BigDecimal(totalTrades), 4, RoundingMode.HALF_UP).multiply(new BigDecimal("100"))
             : BigDecimal.ZERO;
 
         return result;
@@ -186,13 +235,9 @@ public class BacktestService {
         BigDecimal peak = values.get(0);
 
         for (BigDecimal value : values) {
-            if (value.compareTo(peak) > 0) {
-                peak = value;
-            }
+            if (value.compareTo(peak) > 0) peak = value;
             BigDecimal drawdown = peak.subtract(value).divide(peak, 4, RoundingMode.HALF_UP).multiply(new BigDecimal("100"));
-            if (drawdown.compareTo(maxDrawdown) > 0) {
-                maxDrawdown = drawdown;
-            }
+            if (drawdown.compareTo(maxDrawdown) > 0) maxDrawdown = drawdown;
         }
 
         return maxDrawdown;
@@ -203,27 +248,18 @@ public class BacktestService {
 
         List<BigDecimal> returns = new ArrayList<>();
         for (int i = 1; i < values.size(); i++) {
-            BigDecimal ret = values.get(i).subtract(values.get(i - 1))
-                .divide(values.get(i - 1), 4, RoundingMode.HALF_UP);
-            returns.add(ret);
+            returns.add(values.get(i).subtract(values.get(i - 1)).divide(values.get(i - 1), 4, RoundingMode.HALF_UP));
         }
 
-        BigDecimal mean = returns.stream()
-            .reduce(BigDecimal.ZERO, BigDecimal::add)
-            .divide(new BigDecimal(returns.size()), 4, RoundingMode.HALF_UP);
-
-        BigDecimal variance = returns.stream()
-            .map(r -> r.subtract(mean).pow(2))
-            .reduce(BigDecimal.ZERO, BigDecimal::add)
-            .divide(new BigDecimal(returns.size()), 4, RoundingMode.HALF_UP);
+        BigDecimal mean = returns.stream().reduce(BigDecimal.ZERO, BigDecimal::add).divide(new BigDecimal(returns.size()), 4, RoundingMode.HALF_UP);
+        BigDecimal variance = returns.stream().map(r -> r.subtract(mean).pow(2)).reduce(BigDecimal.ZERO, BigDecimal::add).divide(new BigDecimal(returns.size()), 4, RoundingMode.HALF_UP);
 
         return new BigDecimal(Math.sqrt(variance.doubleValue())).multiply(new BigDecimal("100"));
     }
 
     private BigDecimal calculateSharpeRatio(BigDecimal returns, BigDecimal volatility) {
         if (volatility.compareTo(BigDecimal.ZERO) == 0) return BigDecimal.ZERO;
-        BigDecimal riskFreeRate = new BigDecimal("2.5");
-        return returns.subtract(riskFreeRate).divide(volatility, 2, RoundingMode.HALF_UP);
+        return returns.subtract(new BigDecimal("2.5")).divide(volatility, 2, RoundingMode.HALF_UP);
     }
 
     private void setDefaultValues(BacktestResult result) {
@@ -237,70 +273,6 @@ public class BacktestService {
 
     public BacktestResult getBacktestByAdviceId(Long adviceId) {
         return backtestMapper.findByAdviceId(adviceId);
-    }
-
-    private static class Portfolio {
-        BigDecimal cash;
-        Map<String, Position> positions = new HashMap<>();
-        StockHistoryMapper mapper;
-
-        Portfolio(BigDecimal initialCash, StockHistoryMapper mapper) {
-            this.cash = initialCash;
-            this.mapper = mapper;
-        }
-
-        void buy(String stockCode, int shares, BigDecimal price, LocalDate date) {
-            BigDecimal cost = price.multiply(new BigDecimal(shares));
-            cash = cash.subtract(cost);
-            positions.put(stockCode, new Position(shares, price, date));
-        }
-
-        void sell(String stockCode, BigDecimal price) {
-            Position pos = positions.remove(stockCode);
-            if (pos != null) {
-                cash = cash.add(price.multiply(new BigDecimal(pos.shares)));
-            }
-        }
-
-        boolean hasPosition(String stockCode) {
-            return positions.containsKey(stockCode);
-        }
-
-        Position getPosition(String stockCode) {
-            return positions.get(stockCode);
-        }
-
-        BigDecimal calculateTotalValue(LocalDate date) {
-            BigDecimal total = cash;
-            for (Map.Entry<String, Position> entry : positions.entrySet()) {
-                BigDecimal currentPrice = getCurrentPrice(entry.getKey(), date);
-                total = total.add(currentPrice.multiply(new BigDecimal(entry.getValue().shares)));
-            }
-            return total;
-        }
-
-        void closeAllPositions(LocalDate date, Map<String, Integer> tradeResults) {
-            for (String stockCode : new HashSet<>(positions.keySet())) {
-                BigDecimal closePrice = getCurrentPrice(stockCode, date);
-                Position pos = positions.get(stockCode);
-                BigDecimal profit = closePrice.subtract(pos.buyPrice).multiply(new BigDecimal(pos.shares));
-                sell(stockCode, closePrice);
-
-                String key = profit.compareTo(BigDecimal.ZERO) > 0 ? "win" : "loss";
-                tradeResults.put(key, tradeResults.getOrDefault(key, 0) + 1);
-            }
-        }
-
-        private BigDecimal getCurrentPrice(String stockCode, LocalDate date) {
-            for (int i = 0; i < 10; i++) {
-                LocalDate queryDate = date.minusDays(i);
-                List<StockHistory> history = mapper.findByStockCodeAndDateRange(stockCode, queryDate, queryDate);
-                if (!history.isEmpty()) {
-                    return history.get(0).getClosePrice();
-                }
-            }
-            return BigDecimal.ONE;
-        }
     }
 
     private static class Position {
@@ -321,5 +293,15 @@ public class BacktestService {
         BigDecimal volatility;
         BigDecimal sharpeRatio;
         BigDecimal winRate;
+        Map<String, StockDetail> stockDetails = new HashMap<>();
+    }
+
+    private static class StockDetail {
+        BigDecimal totalReturn;
+        int tradeCount;
+        int winCount;
+        BigDecimal entryPrice;
+        BigDecimal exitPrice;
+        String exitReason;
     }
 }

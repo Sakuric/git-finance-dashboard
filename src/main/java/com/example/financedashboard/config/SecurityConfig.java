@@ -50,6 +50,9 @@ public class SecurityConfig {
                         .requestMatchers("/api/investment-preference/**").permitAll() // 允许访问投资偏好接口
                         .requestMatchers("/api/favorites/**").permitAll()//允许访问用户偏好接口
                         .requestMatchers("/api/advice/**").permitAll()//允许访问投资建议接口
+                        .requestMatchers("/api/backtest/**").permitAll()//允许访问回测接口
+                        .requestMatchers("/api/structured-advice/**").permitAll()//允许访问结构化投资建议接口
+                        .requestMatchers("/api/**").permitAll()//允许访问接口
                         .requestMatchers("/error").permitAll() // 允许访问错误页面
                         .anyRequest().authenticated())
                 .httpBasic(httpBasic -> httpBasic.disable()) // 禁用HTTP Basic认证
