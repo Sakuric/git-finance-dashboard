@@ -6,6 +6,7 @@
         <id column="id" property="id"/>
         <result column="backtest_id" property="backtestId"/>
         <result column="advice_id" property="adviceId"/>
+        <result column="backtest_period" property="backtestPeriod"/>
         <result column="stock_code" property="stockCode"/>
         <result column="stock_name" property="stockName"/>
         <result column="suggested_action" property="suggestedAction"/>
@@ -17,6 +18,7 @@
         <result column="exit_price" property="exitPrice"/>
         <result column="exit_reason" property="exitReason"/>
         <result column="no_trade_reason" property="noTradeReason"/>
+        <result column="risk_level" property="riskLevel"/>
         <result column="created_at" property="createdAt"/>
     </resultMap>
 
@@ -34,14 +36,14 @@
 
     <insert id="batchInsert" parameterType="java.util.List">
         INSERT INTO stock_backtest_detail (
-            backtest_id, advice_id, stock_code, stock_name, suggested_action,
+            backtest_id, advice_id, backtest_period, stock_code, stock_name, suggested_action,
             total_return, max_drawdown, trade_count, win_count,
-            entry_price, exit_price, exit_reason, no_trade_reason
+            entry_price, exit_price, exit_reason, no_trade_reason, risk_level
         ) VALUES
         <foreach collection="list" item="item" separator=",">
-            (#{item.backtestId}, #{item.adviceId}, #{item.stockCode}, #{item.stockName}, #{item.suggestedAction},
+            (#{item.backtestId}, #{item.adviceId}, #{item.backtestPeriod}, #{item.stockCode}, #{item.stockName}, #{item.suggestedAction},
              #{item.totalReturn}, #{item.maxDrawdown}, #{item.tradeCount}, #{item.winCount},
-             #{item.entryPrice}, #{item.exitPrice}, #{item.exitReason}, #{item.noTradeReason})
+             #{item.entryPrice}, #{item.exitPrice}, #{item.exitReason}, #{item.noTradeReason}, #{item.riskLevel})
         </foreach>
     </insert>
 

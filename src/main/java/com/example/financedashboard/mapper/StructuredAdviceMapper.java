@@ -16,4 +16,6 @@ public interface StructuredAdviceMapper {
     List<StructuredAdvice> findByAdviceId(@Param("adviceId") Long adviceId);
 
     StructuredAdvice findById(@Param("id") Long id);
+
+    int updateById(StructuredAdvice advice);
 }

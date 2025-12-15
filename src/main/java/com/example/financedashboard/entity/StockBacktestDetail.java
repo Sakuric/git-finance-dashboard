@@ -14,6 +14,7 @@ public class StockBacktestDetail {
     private Long id;
     private Long backtestId;
     private Long adviceId;
+    private String backtestPeriod;
     private String stockCode;
     private String stockName;
     private String suggestedAction;
@@ -25,5 +26,6 @@ public class StockBacktestDetail {
     private BigDecimal exitPrice;
     private String exitReason;
     private String noTradeReason;
+    private String riskLevel;
     private LocalDateTime createdAt;
 }

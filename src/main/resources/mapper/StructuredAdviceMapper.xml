@@ -46,4 +46,11 @@
         SELECT * FROM structured_advice WHERE id = #{id}
     </select>
 
+    <update id="updateById" parameterType="com.example.financedashboard.entity.StructuredAdvice">
+        UPDATE structured_advice
+        SET suggested_action = #{suggestedAction},
+            thesis = #{thesis}
+        WHERE id = #{id}
+    </update>
+
 </mapper>

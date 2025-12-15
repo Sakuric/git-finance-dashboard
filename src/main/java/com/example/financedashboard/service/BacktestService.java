@@ -5,6 +5,7 @@ import com.example.financedashboard.mapper.*;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -24,38 +25,57 @@ public class BacktestService {
     private static final BigDecimal INITIAL_CASH = new BigDecimal("1000000");
     private static final BigDecimal POSITION_SIZE_RATIO = new BigDecimal("0.10");
 
+    @Transactional
     public BacktestResult performBacktest(InvestmentAdvice advice) {
-        BacktestResult result = new BacktestResult();
-        result.setAdviceId(advice.getId());
-
-        LocalDate endDate = LocalDate.now();
-        LocalDate startDate = endDate.minusMonths(6);
-        result.setBacktestStartDate(startDate);
-        result.setBacktestEndDate(endDate);
-        result.setBacktestDuration(180);
-
         List<StructuredAdvice> advices = structuredAdviceMapper.findByAdviceId(advice.getId());
         if (advices.isEmpty()) {
+            BacktestResult result = new BacktestResult();
+            result.setAdviceId(advice.getId());
             setDefaultValues(result);
             backtestMapper.insert(result);
             return result;
         }
 
-        SimulationResult simulation = runSimulation(advices, startDate, endDate);
+        LocalDate endDate = LocalDate.now();
+        String[] periods = {"1M", "3M", "6M", "1Y"};
+        Map<String, Map<String, StockDetail>> allPeriodResults = new HashMap<>();
 
-        result.setTotalReturn(simulation.totalReturn);
-        result.setAnnualizedReturn(simulation.totalReturn.multiply(new BigDecimal("2")));
-        result.setMaxDrawdown(simulation.maxDrawdown);
-        result.setSharpeRatio(simulation.sharpeRatio);
-        result.setWinRate(simulation.winRate);
-        result.setVolatility(simulation.volatility);
-        result.setIsSuccess(simulation.totalReturn.compareTo(BigDecimal.ZERO) > 0 ? 1 : 0);
-        result.setFailureReason("基于具体买卖价位的回测结果，仅供参考");
+        for (String period : periods) {
+            LocalDate startDate = calculateStartDate(endDate, period);
+            SimulationResult simulation = runSimulation(advices, startDate, endDate);
+            allPeriodResults.put(period, simulation.stockDetails);
+        }
+
+        BacktestResult result = new BacktestResult();
+        result.setAdviceId(advice.getId());
+        result.setBacktestStartDate(calculateStartDate(endDate, "6M"));
+        result.setBacktestEndDate(endDate);
+        result.setBacktestDuration(180);
+
+        SimulationResult mainSimulation = runSimulation(advices, calculateStartDate(endDate, "6M"), endDate);
+        result.setTotalReturn(mainSimulation.totalReturn);
+        result.setAnnualizedReturn(mainSimulation.totalReturn.multiply(new BigDecimal("2")));
+        result.setMaxDrawdown(mainSimulation.maxDrawdown);
+        result.setSharpeRatio(mainSimulation.sharpeRatio);
+        result.setWinRate(mainSimulation.winRate);
+        result.setVolatility(mainSimulation.volatility);
+        result.setIsSuccess(mainSimulation.totalReturn.compareTo(BigDecimal.ZERO) > 0 ? 1 : 0);
+        result.setFailureReason("多周期回测结果，仅供参考");
 
         backtestMapper.insert(result);
-        saveStockDetails(result.getId(), advice.getId(), advices, simulation.stockDetails);
+        saveMultiPeriodDetails(result.getId(), advice.getId(), advices, allPeriodResults);
 
         return result;
+    }
+
+    private LocalDate calculateStartDate(LocalDate endDate, String period) {
+        switch (period) {
+            case "1M": return endDate.minusMonths(1);
+            case "3M": return endDate.minusMonths(3);
+            case "6M": return endDate.minusMonths(6);
+            case "1Y": return endDate.minusYears(1);
+            default: return endDate.minusMonths(6);
+        }
     }
 
     private SimulationResult runSimulation(List<StructuredAdvice> advices, LocalDate startDate, LocalDate endDate) {
@@ -175,41 +195,89 @@ public class BacktestService {
         return BigDecimal.ONE;
     }
 
-    private void saveStockDetails(Long backtestId, Long adviceId, List<StructuredAdvice> advices, Map<String, StockDetail> stockDetails) {
+    private void saveMultiPeriodDetails(Long backtestId, Long adviceId, List<StructuredAdvice> advices,
+                                        Map<String, Map<String, StockDetail>> allPeriodResults) {
         List<StockBacktestDetail> details = new ArrayList<>();
 
         for (StructuredAdvice advice : advices) {
-            StockBacktestDetail detail = new StockBacktestDetail();
-            detail.setBacktestId(backtestId);
-            detail.setAdviceId(adviceId);
-            detail.setStockCode(advice.getStockCode());
-            detail.setStockName(advice.getStockName());
-            detail.setSuggestedAction(advice.getSuggestedAction());
+            for (String period : new String[]{"1M", "3M", "6M", "1Y"}) {
+                StockBacktestDetail detail = new StockBacktestDetail();
+                detail.setBacktestId(backtestId);
+                detail.setAdviceId(adviceId);
+                detail.setBacktestPeriod(period);
+                detail.setStockCode(advice.getStockCode());
+                detail.setStockName(advice.getStockName());
+                detail.setSuggestedAction(advice.getSuggestedAction());
 
-            StockDetail sd = stockDetails.get(advice.getStockCode());
-            if (sd != null && sd.entryPrice != null) {
-                detail.setTotalReturn(sd.totalReturn);
-                detail.setTradeCount(sd.tradeCount);
-                detail.setWinCount(sd.winCount);
-                detail.setEntryPrice(sd.entryPrice);
-                detail.setExitPrice(sd.exitPrice);
-                detail.setExitReason(sd.exitReason);
-            } else {
-                if ("NOT_RECOMMENDED".equals(advice.getSuggestedAction())) {
-                    detail.setNoTradeReason("不建议投资");
-                } else if ("HOLD".equals(advice.getSuggestedAction())) {
-                    detail.setNoTradeReason("持有观望，无交易策略");
-                } else if ("BUY".equals(advice.getSuggestedAction())) {
-                    detail.setNoTradeReason("价格未触及买入区间");
+                Map<String, StockDetail> periodDetails = allPeriodResults.get(period);
+                StockDetail sd = periodDetails != null ? periodDetails.get(advice.getStockCode()) : null;
+
+                if (sd != null && sd.entryPrice != null) {
+                    detail.setTotalReturn(sd.totalReturn);
+                    detail.setTradeCount(sd.tradeCount);
+                    detail.setWinCount(sd.winCount);
+                    detail.setEntryPrice(sd.entryPrice);
+                    detail.setExitPrice(sd.exitPrice);
+                    detail.setExitReason(sd.exitReason);
+                } else {
+                    if ("NOT_RECOMMENDED".equals(advice.getSuggestedAction())) {
+                        detail.setNoTradeReason("不建议投资");
+                    } else if ("HOLD".equals(advice.getSuggestedAction())) {
+                        detail.setNoTradeReason("持有观望，无交易策略");
+                    } else if ("BUY".equals(advice.getSuggestedAction())) {
+                        detail.setNoTradeReason("价格未触及买入区间");
+                    }
                 }
-            }
 
-            details.add(detail);
+                details.add(detail);
+            }
         }
+
+        calculateRiskLevels(details);
 
         if (!details.isEmpty()) {
             detailMapper.batchInsert(details);
-            log.info("保存了{}只股票的回测详情", details.size());
+            log.info("保存了{}只股票的多周期回测详情", details.size());
+        }
+    }
+
+    private void calculateRiskLevels(List<StockBacktestDetail> details) {
+        Map<String, List<StockBacktestDetail>> stockGroups = new HashMap<>();
+        for (StockBacktestDetail detail : details) {
+            stockGroups.computeIfAbsent(detail.getStockCode(), k -> new ArrayList<>()).add(detail);
+        }
+
+        for (List<StockBacktestDetail> group : stockGroups.values()) {
+            int negativeCount = 0;
+            BigDecimal totalVolatility = BigDecimal.ZERO;
+            int validCount = 0;
+
+            for (StockBacktestDetail detail : group) {
+                if (detail.getTotalReturn() != null) {
+                    if (detail.getTotalReturn().compareTo(BigDecimal.ZERO) < 0) {
+                        negativeCount++;
+                    }
+                    totalVolatility = totalVolatility.add(detail.getTotalReturn().abs());
+                    validCount++;
+                }
+            }
+
+            String riskLevel;
+            if (validCount == 0) {
+                riskLevel = "UNKNOWN";
+            } else if (negativeCount == validCount) {
+                riskLevel = "EXTREME";
+            } else if (negativeCount >= 3) {
+                riskLevel = "HIGH";
+            } else if (negativeCount >= 2 || (validCount > 0 && totalVolatility.divide(new BigDecimal(validCount), 2, RoundingMode.HALF_UP).compareTo(new BigDecimal("30")) > 0)) {
+                riskLevel = "MEDIUM";
+            } else {
+                riskLevel = "LOW";
+            }
+
+            for (StockBacktestDetail detail : group) {
+                detail.setRiskLevel(riskLevel);
+            }
         }
     }
 
