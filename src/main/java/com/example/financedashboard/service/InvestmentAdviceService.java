@@ -30,6 +30,8 @@ public class InvestmentAdviceService {
     private final StockInfoMapper stockInfoMapper;
     private final LLMService llmService;
     private final FinancialNewsService newsService;
+    private final BacktestService backtestService;
+    private final com.example.financedashboard.mapper.StructuredAdviceMapper structuredAdviceMapper;
 
     public InvestmentAdvice generateAdvice(Long userId) {
         InvestmentPreference preference = preferenceMapper.findByUserId(userId);
@@ -66,6 +68,21 @@ public class InvestmentAdviceService {
         advice.setIsRead(0);
 
         adviceMapper.insert(advice);
+
+        // 解析并保存结构化建议
+        try {
+            parseAndSaveStructuredAdvice(advice.getId(), responseJson, preference);
+        } catch (Exception e) {
+            log.error("保存结构化建议失败: {}", e.getMessage(), e);
+        }
+
+        // 执行回测（仅作为风险提示，不影响建议生成）
+        try {
+            backtestService.performBacktest(advice);
+        } catch (Exception e) {
+            log.warn("回测执行失败，不影响建议生成: {}", e.getMessage());
+        }
+
         return advice;
     }
 
@@ -129,13 +146,21 @@ public class InvestmentAdviceService {
         prompt.append("    {\n");
         prompt.append("      \"code\": \"股票代码\",\n");
         prompt.append("      \"name\": \"股票名称\",\n");
-        prompt.append("      \"suggestedAction\": \"买入/持有/卖出\",\n");
-        prompt.append("      \"thesis\": \"综合四大维度资讯的投资逻辑和理由\",\n");
-        prompt.append("      \"entryPrice\": \"建议操作价格区间\"\n");
+        prompt.append("      \"suggestedAction\": \"BUY-买入/HOLD-持有/SELL-卖出/NOT_RECOMMENDED-不建议\",\n");
+        prompt.append("      \"thesis\": \"综合四大维度资讯的投资逻辑和理由（若不建议投资，详细说明原因）\",\n");
+        prompt.append("      \"entryPriceStart\": \"建议买入价格区间-起始价（数字，如45.00）\",\n");
+        prompt.append("      \"entryPriceEnd\": \"建议买入价格区间-结束价（数字，如47.00）\",\n");
+        prompt.append("      \"takeProfitPrice\": \"止盈价格（数字，如55.00）\",\n");
+        prompt.append("      \"stopLossPrice\": \"止损价格（数字，如42.00）\"\n");
         prompt.append("    }\n");
         prompt.append("  ]\n");
         prompt.append("}\n");
-        prompt.append("```\n");
+        prompt.append("```\n\n");
+        prompt.append("**重要说明**：\n");
+        prompt.append("1. suggestedAction必须是：BUY、HOLD、SELL、NOT_RECOMMENDED之一\n");
+        prompt.append("2. 对于不建议投资的股票，设置suggestedAction为NOT_RECOMMENDED，并在thesis中详细说明原因\n");
+        prompt.append("3. 价格字段必须是纯数字，不要包含单位或货币符号\n");
+        prompt.append("4. 对于BUY操作，必须提供所有价格字段；对于NOT_RECOMMENDED，价格字段可为null\n");
 
         return prompt.toString();
     }
@@ -176,5 +201,58 @@ public class InvestmentAdviceService {
     private String extractRiskAssessment(JSONObject response) {
         JSONObject company = response.getJSONObject("companyOverview");
         return company != null ? company.getString("content") : "";
+    }
+
+    private void parseAndSaveStructuredAdvice(Long adviceId, JSONObject response, InvestmentPreference preference) {
+        com.alibaba.fastjson2.JSONArray recommendations = response.getJSONArray("recommendations");
+        if (recommendations == null || recommendations.isEmpty()) {
+            log.warn("LLM响应中没有recommendations数组");
+            return;
+        }
+
+        List<com.example.financedashboard.entity.StructuredAdvice> structuredAdvices = new ArrayList<>();
+        Integer effectiveDays = calculateEffectiveDays(preference);
+
+        for (int i = 0; i < recommendations.size(); i++) {
+            JSONObject rec = recommendations.getJSONObject(i);
+            com.example.financedashboard.entity.StructuredAdvice sa = new com.example.financedashboard.entity.StructuredAdvice();
+            sa.setAdviceId(adviceId);
+            sa.setStockCode(rec.getString("code"));
+            sa.setStockName(rec.getString("name"));
+            sa.setSuggestedAction(rec.getString("suggestedAction"));
+            sa.setThesis(rec.getString("thesis"));
+            sa.setEntryPriceStart(rec.getBigDecimal("entryPriceStart"));
+            sa.setEntryPriceEnd(rec.getBigDecimal("entryPriceEnd"));
+            sa.setTakeProfitPrice(rec.getBigDecimal("takeProfitPrice"));
+            sa.setStopLossPrice(rec.getBigDecimal("stopLossPrice"));
+            sa.setAdviceEffectiveDays(effectiveDays);
+            structuredAdvices.add(sa);
+        }
+
+        if (!structuredAdvices.isEmpty()) {
+            structuredAdviceMapper.batchInsert(structuredAdvices);
+            log.info("保存了{}条结构化建议", structuredAdvices.size());
+        }
+    }
+
+    private Integer calculateEffectiveDays(InvestmentPreference preference) {
+        if ("custom".equals(preference.getInvestmentHorizonType())) {
+            if (preference.getInvestmentHorizonCustomDays() != null) {
+                return preference.getInvestmentHorizonCustomDays();
+            }
+            if (preference.getInvestmentHorizonCustomMonths() != null) {
+                return preference.getInvestmentHorizonCustomMonths() * 30;
+            }
+            if (preference.getInvestmentHorizonCustomYears() != null) {
+                return preference.getInvestmentHorizonCustomYears() * 365;
+            }
+        }
+
+        String preset = preference.getInvestmentHorizonPreset();
+        if ("short".equals(preset)) return 90;
+        if ("medium".equals(preset)) return 180;
+        if ("long".equals(preset)) return 365;
+
+        return 180;
     }
 }

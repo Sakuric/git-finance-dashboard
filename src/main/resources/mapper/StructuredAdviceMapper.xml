@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.example.financedashboard.mapper.StructuredAdviceMapper">
+
+    <resultMap id="BaseResultMap" type="com.example.financedashboard.entity.StructuredAdvice">
+        <id column="id" property="id"/>
+        <result column="advice_id" property="adviceId"/>
+        <result column="stock_code" property="stockCode"/>
+        <result column="stock_name" property="stockName"/>
+        <result column="suggested_action" property="suggestedAction"/>
+        <result column="thesis" property="thesis"/>
+        <result column="entry_price_start" property="entryPriceStart"/>
+        <result column="entry_price_end" property="entryPriceEnd"/>
+        <result column="take_profit_price" property="takeProfitPrice"/>
+        <result column="stop_loss_price" property="stopLossPrice"/>
+        <result column="advice_effective_days" property="adviceEffectiveDays"/>
+        <result column="created_at" property="createdAt"/>
+    </resultMap>
+
+    <insert id="insert" parameterType="com.example.financedashboard.entity.StructuredAdvice" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO structured_advice (
+            advice_id, stock_code, stock_name, suggested_action, thesis,
+            entry_price_start, entry_price_end, take_profit_price, stop_loss_price, advice_effective_days
+        ) VALUES (
+            #{adviceId}, #{stockCode}, #{stockName}, #{suggestedAction}, #{thesis},
+            #{entryPriceStart}, #{entryPriceEnd}, #{takeProfitPrice}, #{stopLossPrice}, #{adviceEffectiveDays}
+        )
+    </insert>
+
+    <insert id="batchInsert" parameterType="java.util.List">
+        INSERT INTO structured_advice (
+            advice_id, stock_code, stock_name, suggested_action, thesis,
+            entry_price_start, entry_price_end, take_profit_price, stop_loss_price, advice_effective_days
+        ) VALUES
+        <foreach collection="list" item="item" separator=",">
+            (#{item.adviceId}, #{item.stockCode}, #{item.stockName}, #{item.suggestedAction}, #{item.thesis},
+             #{item.entryPriceStart}, #{item.entryPriceEnd}, #{item.takeProfitPrice}, #{item.stopLossPrice}, #{item.adviceEffectiveDays})
+        </foreach>
+    </insert>
+
+    <select id="findByAdviceId" resultMap="BaseResultMap">
+        SELECT * FROM structured_advice WHERE advice_id = #{adviceId} ORDER BY id
+    </select>
+
+    <select id="findById" resultMap="BaseResultMap">
+        SELECT * FROM structured_advice WHERE id = #{id}
+    </select>
+
+</mapper>
