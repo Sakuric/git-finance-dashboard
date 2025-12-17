@@ -1,258 +1,126 @@
 <template>
-  <div class="auth-body">
-    <div class="auth-container">
-      <!-- 左侧背景装饰 -->
-      <div class="auth-background">
-        <div class="floating-chart">
-          <div class="chart-line"></div>
-          <div class="chart-line"></div>
-          <div class="chart-line"></div>
-          <div class="chart-line"></div>
-        </div>
-        <div class="floating-icons">
-          <i class="fas fa-chart-line"></i>
-          <i class="fas fa-coins"></i>
-          <i class="fas fa-trending-up"></i>
-          <i class="fas fa-dollar-sign"></i>
-          <i class="fas fa-chart-pie"></i>
-        </div>
+  <div class="login-page">
+    <!-- 粒子背景 -->
+    <div class="particles-bg">
+      <div class="particle" v-for="n in 60" :key="n"></div>
+    </div>
+    
+    <!-- 网格线背景 -->
+    <div class="grid-bg"></div>
+    
+    <!-- 光晕效果 -->
+    <div class="glow-orb glow-1"></div>
+    <div class="glow-orb glow-2"></div>
+    
+    <!-- 登录卡片 - 居中 -->
+    <div class="login-card">
+      <!-- Logo -->
+      <div class="login-logo">
+        <i class="fas fa-chart-pie"></i>
+        <h1>量融</h1>
       </div>
-
-      <!-- 右侧登录/注册表单 -->
-      <div class="auth-form-container">
-        <!-- Logo和标题 -->
-        <div class="auth-header">
-          <div class="logo">
-            <i class="fas fa-chart-pie"></i>
-            <h1>量融</h1>
-          </div>
-          <p class="auth-subtitle">智能金融投资平台</p>
+      <p class="login-subtitle">智能金融投资平台</p>
+      
+      <!-- 登录表单 -->
+      <div v-show="currentForm === 'login'">
+        <div class="test-info">
+          <span>测试账号: testuser</span>
+          <span>密码: 123456</span>
         </div>
-
-        <!-- 登录表单 -->
-        <div id="login-form" class="auth-form active" v-show="currentForm === 'login'">
-          <h2>登录账户</h2>
-          <div class="test-account-info">
-            <p>测试账号：admin@example.com</p>
-            <p>测试密码：password123</p>
-          </div>
-          <form @submit.prevent="handleLogin">
-            <div class="form-group">
-              <label for="login-email">邮箱地址</label>
-              <div class="input-group">
-                <i class="fas fa-envelope"></i>
-                <input 
-                  type="email" 
-                  id="login-email" 
-                  v-model="loginForm.email" 
-                  placeholder="请输入您的邮箱" 
-                  required
-                >
-              </div>
-              <span class="error-message" v-if="errors.loginEmail">{{ errors.loginEmail }}</span>
-            </div>
-          
-            <div class="form-group">
-              <label for="login-password">密码</label>
-              <div class="input-group">
-                <i class="fas fa-lock"></i>
-                <input 
-                  :type="showLoginPassword ? 'text' : 'password'" 
-                  id="login-password" 
-                  v-model="loginForm.password" 
-                  placeholder="请输入您的密码" 
-                  required
-                >
-                <button 
-                  type="button" 
-                  class="toggle-password" 
-                  @click="togglePasswordVisibility('login')"
-                  title="显示/隐藏密码"
-                >
-                  <i :class="showLoginPassword ? 'fas fa-eye-slash' : 'fas fa-eye'"></i>
-                </button>
-              </div>
-              <span class="error-message" v-if="errors.loginPassword">{{ errors.loginPassword }}</span>
-            </div>
-          
-            <div class="form-options">
-              <label class="checkbox-container">
-                <input type="checkbox" v-model="loginForm.rememberMe">
-                <span class="checkmark"></span>
-                记住我
-              </label>
-              <a href="#" @click.prevent="handleForgotPassword" class="forgot-password">忘记密码？</a>
-            </div>
-          
-            <button type="submit" class="auth-btn" :disabled="loginLoading">
-              <span class="btn-text" v-if="!loginLoading">登录</span>
-              <div class="btn-loader" v-if="loginLoading">
-                <i class="fas fa-spinner fa-spin"></i>
-              </div>
-            </button>
-          </form>
         
-          <div class="auth-footer">
-            <p>还没有账户？<a href="#" @click.prevent="showRegisterForm" class="register-link">立即注册</a></p>
-          </div>
-        </div>
-
-        <!-- 注册表单 -->
-        <div id="register-form" class="auth-form" v-show="currentForm === 'register'">
-          <h2>创建账户</h2>
-          <form @submit.prevent="handleRegister">
-            <div class="form-group">
-              <label for="register-username">用户名</label>
-              <div class="input-group">
-                <i class="fas fa-user"></i>
-                <input 
-                  type="text" 
-                  id="register-username" 
-                  v-model="registerForm.username" 
-                  placeholder="请输入用户名" 
-                  required
-                >
-              </div>
-              <span class="error-message" v-if="errors.registerUsername">{{ errors.registerUsername }}</span>
-            </div>
-          
-            <div class="form-group">
-              <label for="register-email">邮箱地址</label>
-              <div class="input-group">
-                <i class="fas fa-envelope"></i>
-                <input 
-                  type="email" 
-                  id="register-email" 
-                  v-model="registerForm.email" 
-                  placeholder="请输入您的邮箱" 
-                  required
-                >
-              </div>
-              <span class="error-message" v-if="errors.registerEmail">{{ errors.registerEmail }}</span>
-            </div>
-          
-            <div class="form-group">
-              <label for="register-password">密码</label>
-              <div class="input-group">
-                <i class="fas fa-lock"></i>
-                <input 
-                  :type="showRegisterPassword ? 'text' : 'password'" 
-                  id="register-password" 
-                  v-model="registerForm.password" 
-                  placeholder="请输入密码（至少8位）" 
-                  required
-                >
-                <button 
-                  type="button" 
-                  class="toggle-password" 
-                  @click="togglePasswordVisibility('register')"
-                  title="显示/隐藏密码"
-                >
-                  <i :class="showRegisterPassword ? 'fas fa-eye-slash' : 'fas fa-eye'"></i>
-                </button>
-              </div>
-              <span class="error-message" v-if="errors.registerPassword">{{ errors.registerPassword }}</span>
-            </div>
-          
-            <div class="form-group">
-              <label for="register-confirm-password">确认密码</label>
-              <div class="input-group">
-                <i class="fas fa-lock"></i>
-                <input 
-                  :type="showConfirmPassword ? 'text' : 'password'" 
-                  id="register-confirm-password" 
-                  v-model="registerForm.confirmPassword" 
-                  placeholder="请再次输入密码" 
-                  required
-                >
-                <button 
-                  type="button" 
-                  class="toggle-password" 
-                  @click="togglePasswordVisibility('confirm')"
-                  title="显示/隐藏密码"
-                >
-                  <i :class="showConfirmPassword ? 'fas fa-eye-slash' : 'fas fa-eye'"></i>
-                </button>
-              </div>
-              <span class="error-message" v-if="errors.registerConfirmPassword">{{ errors.registerConfirmPassword }}</span>
-            </div>
-          
-            <div class="form-group">
-              <label class="checkbox-container">
-                <input type="checkbox" v-model="registerForm.agreeTerms" required>
-                <span class="checkmark"></span>
-                我已阅读并同意<a href="#" class="terms-link">服务条款</a>和<a href="#" class="privacy-link">隐私政策</a>
-              </label>
-            </div>
-          
-            <button type="submit" class="auth-btn" :disabled="registerLoading">
-              <span class="btn-text" v-if="!registerLoading">注册</span>
-              <div class="btn-loader" v-if="registerLoading">
-                <i class="fas fa-spinner fa-spin"></i>
-              </div>
-            </button>
-          </form>
-        
-          <div class="auth-footer">
-            <p>已有账户？<a href="#" @click.prevent="showLoginForm" class="login-link">立即登录</a></p>
-          </div>
-          
-          <!-- 返回登录按钮 - 更醒目的样式 -->
-          <div style="margin-top: 20px; text-align: center;">
-            <button
-              type="button"
-              class="btn-back-to-login"
-              @click="showLoginForm"
+        <form @submit.prevent="handleLogin">
+          <div class="input-field" :class="{ error: loginErrors.username }">
+            <i class="fas fa-user"></i>
+            <input
+              type="text"
+              v-model="loginForm.username"
+              placeholder="用户名/邮箱"
+              @blur="validateLoginField('username')"
             >
-              <i class="fas fa-arrow-left"></i>
-              返回登录
+            <span class="error-msg" v-if="loginErrors.username">{{ loginErrors.username }}</span>
+          </div>
+          
+          <div class="input-field" :class="{ error: loginErrors.password }">
+            <i class="fas fa-lock"></i>
+            <input
+              :type="showPassword ? 'text' : 'password'"
+              v-model="loginForm.password"
+              placeholder="密码"
+              @blur="validateLoginField('password')"
+            >
+            <button type="button" class="eye-btn" @click="showPassword = !showPassword">
+              <i :class="showPassword ? 'fas fa-eye-slash' : 'fas fa-eye'"></i>
             </button>
+            <span class="error-msg" v-if="loginErrors.password">{{ loginErrors.password }}</span>
           </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- 提示消息 -->
-    <div id="notification" class="notification" :class="{ show: notification.show, [notification.type]: true }">
-      <div class="notification-content">
-        <i :class="notification.type === 'success' ? 'fas fa-check-circle' : 'fas fa-exclamation-circle'"></i>
-        <span>{{ notification.message }}</span>
-      </div>
-    </div>
-
-    <!-- 忘记密码模态框 -->
-    <div v-if="showForgotPasswordModal" class="forgot-password-modal">
-      <div class="modal-content">
-        <div class="modal-header">
-          <h3>重置密码</h3>
-          <button class="modal-close" @click="closeForgotPasswordModal">&times;</button>
-        </div>
-        <div class="modal-body">
-          <p>请输入您的邮箱地址，我们将向您发送密码重置链接。</p>
-          <div class="form-group">
-            <label for="reset-email">邮箱地址</label>
-            <div class="input-group">
-              <i class="fas fa-envelope"></i>
-              <input 
-                type="email" 
-                id="reset-email" 
-                v-model="resetEmail" 
-                placeholder="请输入您的邮箱" 
-                required
-              >
-            </div>
-            <span class="error-message" v-if="errors.resetEmail">{{ errors.resetEmail }}</span>
+          
+          <div class="form-options">
+            <label class="remember-me">
+              <input type="checkbox" v-model="loginForm.rememberMe">
+              <span>记住我</span>
+            </label>
+            <a href="#" @click.prevent="showForgotModal = true">忘记密码？</a>
           </div>
-        </div>
-        <div class="modal-footer">
-          <button type="button" class="btn-secondary" @click="closeForgotPasswordModal">取消</button>
-          <button type="button" class="btn-primary" @click="sendResetEmail" :disabled="resetLoading">
-            <span v-if="!resetLoading">发送重置链接</span>
-            <i v-if="resetLoading" class="fas fa-spinner fa-spin"></i>
+          
+          <button type="submit" class="login-btn" :disabled="loading">
+            <span v-if="!loading">登 录</span>
+            <i v-else class="fas fa-spinner fa-spin"></i>
           </button>
-        </div>
+          
+          <button type="button" class="quick-login-btn" @click="quickLogin" :disabled="loading">
+            <i class="fas fa-bolt"></i>
+            快速登录
+          </button>
+        </form>
+        
+        <p class="switch-form">
+          还没有账户？<a href="#" @click.prevent="currentForm = 'register'">立即注册</a>
+        </p>
       </div>
-      <div class="modal-backdrop" @click="closeForgotPasswordModal"></div>
+      
+      <!-- 注册表单 -->
+      <div v-show="currentForm === 'register'">
+        <form @submit.prevent="handleRegister">
+          <div class="input-field" :class="{ error: registerErrors.username }">
+            <i class="fas fa-user"></i>
+            <input type="text" v-model="registerForm.username" placeholder="用户名 (3-20字符)" @blur="validateRegisterField('username')">
+            <span class="error-msg" v-if="registerErrors.username">{{ registerErrors.username }}</span>
+          </div>
+          
+          <div class="input-field" :class="{ error: registerErrors.email }">
+            <i class="fas fa-envelope"></i>
+            <input type="email" v-model="registerForm.email" placeholder="邮箱" @blur="validateRegisterField('email')">
+            <span class="error-msg" v-if="registerErrors.email">{{ registerErrors.email }}</span>
+          </div>
+          
+          <div class="input-field" :class="{ error: registerErrors.password }">
+            <i class="fas fa-lock"></i>
+            <input type="password" v-model="registerForm.password" placeholder="密码 (至少6位)" @blur="validateRegisterField('password')">
+            <span class="error-msg" v-if="registerErrors.password">{{ registerErrors.password }}</span>
+          </div>
+          
+          <div class="input-field" :class="{ error: registerErrors.confirmPassword }">
+            <i class="fas fa-lock"></i>
+            <input type="password" v-model="registerForm.confirmPassword" placeholder="确认密码" @blur="validateRegisterField('confirmPassword')">
+            <span class="error-msg" v-if="registerErrors.confirmPassword">{{ registerErrors.confirmPassword }}</span>
+          </div>
+          
+          <button type="submit" class="login-btn" :disabled="loading">
+            <span v-if="!loading">注 册</span>
+            <i v-else class="fas fa-spinner fa-spin"></i>
+          </button>
+        </form>
+        
+        <p class="switch-form">
+          已有账户？<a href="#" @click.prevent="currentForm = 'login'">立即登录</a>
+        </p>
+      </div>
+    </div>
+    
+    <!-- 通知 -->
+    <div class="toast" :class="{ show: toast.show, success: toast.type === 'success', error: toast.type === 'error' }">
+      <i :class="toast.type === 'success' ? 'fas fa-check-circle' : 'fas fa-exclamation-circle'"></i>
+      {{ toast.message }}
     </div>
   </div>
 </template>
@@ -261,301 +129,557 @@
 import { ref, reactive } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
+import * as userApi from '@/api/user'
 
 export default {
   name: 'Login',
   setup() {
     const router = useRouter()
     const authStore = useAuthStore()
-
-    // 表单状态
+    
     const currentForm = ref('login')
-    const showLoginPassword = ref(false)
-    const showRegisterPassword = ref(false)
-    const showConfirmPassword = ref(false)
-    const loginLoading = ref(false)
-    const registerLoading = ref(false)
-    const resetLoading = ref(false)
-    const showForgotPasswordModal = ref(false)
-    const resetEmail = ref('')
-
-    // 表单数据
-    const loginForm = reactive({
-      email: '',
-      password: '',
-      rememberMe: false
-    })
-
-    const registerForm = reactive({
-      username: '',
-      email: '',
-      password: '',
-      confirmPassword: '',
-      agreeTerms: false
-    })
-
-    // 错误信息
-    const errors = reactive({
-      loginEmail: '',
-      loginPassword: '',
-      registerUsername: '',
-      registerEmail: '',
-      registerPassword: '',
-      registerConfirmPassword: '',
-      resetEmail: ''
-    })
-
-    // 通知消息
-    const notification = reactive({
-      show: false,
-      message: '',
-      type: 'success'
-    })
-
-    // 显示通知
-    const showNotification = (message, type = 'success') => {
-      notification.message = message
-      notification.type = type
-      notification.show = true
-      
-      setTimeout(() => {
-        notification.show = false
-      }, 3000)
-    }
-
-    // 切换表单
-    const showRegisterForm = () => {
-      currentForm.value = 'register'
-      clearAllErrors()
-    }
-
-    const showLoginForm = () => {
-      currentForm.value = 'login'
-      clearAllErrors()
-    }
-
-    // 切换密码可见性
-    const togglePasswordVisibility = (type) => {
-      switch (type) {
-        case 'login':
-          showLoginPassword.value = !showLoginPassword.value
-          break
-        case 'register':
-          showRegisterPassword.value = !showRegisterPassword.value
-          break
-        case 'confirm':
-          showConfirmPassword.value = !showConfirmPassword.value
-          break
+    const showPassword = ref(false)
+    const loading = ref(false)
+    const showForgotModal = ref(false)
+    
+    const loginForm = reactive({ username: '', password: '', rememberMe: false })
+    const registerForm = reactive({ username: '', email: '', password: '', confirmPassword: '' })
+    const loginErrors = reactive({ username: '', password: '' })
+    const registerErrors = reactive({ username: '', email: '', password: '', confirmPassword: '' })
+    const toast = reactive({ show: false, message: '', type: 'success' })
+    
+    const validateLoginField = (field) => {
+      if (field === 'username') {
+        loginErrors.username = loginForm.username ? '' : '请输入用户名'
+      } else if (field === 'password') {
+        loginErrors.password = loginForm.password ? '' : '请输入密码'
       }
     }
-
-    // 清除所有错误
-    const clearAllErrors = () => {
-      Object.keys(errors).forEach(key => {
-        errors[key] = ''
-      })
+    
+    const validateRegisterField = (field) => {
+      if (field === 'username') {
+        if (!registerForm.username) registerErrors.username = '请输入用户名'
+        else if (registerForm.username.length < 3 || registerForm.username.length > 20) registerErrors.username = '用户名需3-20个字符'
+        else registerErrors.username = ''
+      } else if (field === 'email') {
+        const emailReg = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+        if (!registerForm.email) registerErrors.email = '请输入邮箱'
+        else if (!emailReg.test(registerForm.email)) registerErrors.email = '邮箱格式不正确'
+        else registerErrors.email = ''
+      } else if (field === 'password') {
+        if (!registerForm.password) registerErrors.password = '请输入密码'
+        else if (registerForm.password.length < 6) registerErrors.password = '密码至少6位'
+        else registerErrors.password = ''
+      } else if (field === 'confirmPassword') {
+        if (!registerForm.confirmPassword) registerErrors.confirmPassword = '请确认密码'
+        else if (registerForm.confirmPassword !== registerForm.password) registerErrors.confirmPassword = '两次密码不一致'
+        else registerErrors.confirmPassword = ''
+      }
     }
-
-    // 邮箱验证
-    const isValidEmail = (email) => {
-      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
-      return emailRegex.test(email)
+    
+    const validateLogin = () => {
+      validateLoginField('username')
+      validateLoginField('password')
+      return !loginErrors.username && !loginErrors.password
     }
-
-    // 验证登录表单
-    const validateLoginForm = () => {
-      clearAllErrors()
-      let isValid = true
-
-      if (!loginForm.email.trim()) {
-        errors.loginEmail = '请输入邮箱地址'
-        isValid = false
-      } else if (!isValidEmail(loginForm.email)) {
-        errors.loginEmail = '请输入有效的邮箱地址'
-        isValid = false
-      }
-
-      if (!loginForm.password) {
-        errors.loginPassword = '请输入密码'
-        isValid = false
-      } else if (loginForm.password.length < 6) {
-        errors.loginPassword = '密码至少需要6个字符'
-        isValid = false
-      }
-
-      return isValid
+    
+    const validateRegister = () => {
+      validateRegisterField('username')
+      validateRegisterField('email')
+      validateRegisterField('password')
+      validateRegisterField('confirmPassword')
+      return !registerErrors.username && !registerErrors.email && !registerErrors.password && !registerErrors.confirmPassword
     }
-
-    // 验证注册表单
-    const validateRegisterForm = () => {
-      clearAllErrors()
-      let isValid = true
-
-      if (!registerForm.username.trim()) {
-        errors.registerUsername = '请输入用户名'
-        isValid = false
-      } else if (registerForm.username.length < 3) {
-        errors.registerUsername = '用户名至少需要3个字符'
-        isValid = false
-      }
-
-      if (!registerForm.email.trim()) {
-        errors.registerEmail = '请输入邮箱地址'
-        isValid = false
-      } else if (!isValidEmail(registerForm.email)) {
-        errors.registerEmail = '请输入有效的邮箱地址'
-        isValid = false
-      }
-
-      if (!registerForm.password) {
-        errors.registerPassword = '请输入密码'
-        isValid = false
-      } else if (registerForm.password.length < 6) {
-        errors.registerPassword = '密码至少需要6个字符'
-        isValid = false
-      }
-
-      if (!registerForm.confirmPassword) {
-        errors.registerConfirmPassword = '请确认密码'
-        isValid = false
-      } else if (registerForm.password !== registerForm.confirmPassword) {
-        errors.registerConfirmPassword = '两次输入的密码不一致'
-        isValid = false
-      }
-
-      if (!registerForm.agreeTerms) {
-        showNotification('请同意服务条款和隐私政策', 'error')
-        isValid = false
-      }
-
-      return isValid
+    
+    const showToast = (message, type = 'success') => {
+      toast.message = message
+      toast.type = type
+      toast.show = true
+      setTimeout(() => toast.show = false, 3000)
     }
-
-    // 处理登录
+    
+    const quickLogin = () => {
+      loginForm.username = 'testuser'
+      loginForm.password = '123456'
+      handleLogin()
+    }
+    
     const handleLogin = async () => {
-      if (!validateLoginForm()) return
-
-      loginLoading.value = true
-
-      // 模拟登录请求
-      setTimeout(() => {
-        if (loginForm.email === 'admin@example.com' && loginForm.password === 'password123') {
-          authStore.login(loginForm.email)
-          showNotification('登录成功！正在跳转...', 'success')
-          
-          setTimeout(() => {
-            router.push('/dashboard')
-          }, 1500)
-        } else {
-          showNotification('邮箱或密码错误', 'error')
-        }
-        loginLoading.value = false
-      }, 1500)
-    }
-
-    // 处理注册
-    const handleRegister = async () => {
-      console.log('开始注册流程')
-      console.log('注册表单数据:', registerForm)
+      if (!validateLogin()) return
       
-      if (!validateRegisterForm()) {
-        console.log('表单验证失败')
-        return
+      loading.value = true
+      try {
+        const res = await userApi.login({
+          username: loginForm.username,
+          password: loginForm.password
+        })
+        //存储
+        if (res.code === 200 && res.data) {
+          authStore.setToken(res.data)
+          authStore.login(loginForm.username)
+          showToast('登录成功！')
+          setTimeout(() => router.push('/dashboard'), 1000)
+        } else {
+          showToast(res.message || '登录失败', 'error')
+        }
+      } catch (e) {
+        showToast('网络错误', 'error')
+      } finally {
+        loading.value = false
       }
-
-      console.log('表单验证通过，开始注册')
-      registerLoading.value = true
-
-      // 模拟注册请求
-      setTimeout(() => {
-        console.log('注册请求完成')
-        registerLoading.value = false
-        
-        // 清空注册表单
-        Object.keys(registerForm).forEach(key => {
-          if (typeof registerForm[key] === 'boolean') {
-            registerForm[key] = false
-          } else {
-            registerForm[key] = ''
-          }
+    }
+    
+    const handleRegister = async () => {
+      if (!validateRegister()) return
+      
+      loading.value = true
+      try {
+        const res = await userApi.register({
+          username: registerForm.username,
+          email: registerForm.email,
+          password: registerForm.password
         })
         
-        console.log('准备切换到登录表单')
-        console.log('当前表单:', currentForm.value)
-        
-        // 立即切换到登录表单
-        currentForm.value = 'login'
-        
-        console.log('已切换到登录表单:', currentForm.value)
-        
-        // 显示成功消息
-        showNotification('注册成功！请登录', 'success')
-      }, 1000)
-    }
-
-    // 忘记密码
-    const handleForgotPassword = () => {
-      showForgotPasswordModal.value = true
-    }
-
-    const closeForgotPasswordModal = () => {
-      showForgotPasswordModal.value = false
-      resetEmail.value = ''
-      errors.resetEmail = ''
-    }
-
-    const sendResetEmail = () => {
-      errors.resetEmail = ''
-      
-      if (!resetEmail.value.trim()) {
-        errors.resetEmail = '请输入邮箱地址'
-        return
+        if (res.code === 200) {
+          showToast('注册成功！')
+          currentForm.value = 'login'
+        } else {
+          showToast(res.message || '注册失败', 'error')
+        }
+      } catch (e) {
+        showToast('网络错误', 'error')
+      } finally {
+        loading.value = false
       }
-      
-      if (!isValidEmail(resetEmail.value)) {
-        errors.resetEmail = '请输入有效的邮箱地址'
-        return
-      }
-      
-      resetLoading.value = true
-      
-      setTimeout(() => {
-        closeForgotPasswordModal()
-        showNotification('密码重置链接已发送到您的邮箱，请查收', 'success')
-        resetLoading.value = false
-      }, 1500)
     }
-
+    
     return {
-      // 状态
-      currentForm,
-      showLoginPassword,
-      showRegisterPassword,
-      showConfirmPassword,
-      loginLoading,
-      registerLoading,
-      resetLoading,
-      showForgotPasswordModal,
-      resetEmail,
-      
-      // 表单数据
-      loginForm,
-      registerForm,
-      
-      // 错误和通知
-      errors,
-      notification,
-      
-      // 方法
-      showRegisterForm,
-      showLoginForm,
-      togglePasswordVisibility,
-      handleLogin,
-      handleRegister,
-      handleForgotPassword,
-      closeForgotPasswordModal,
-      sendResetEmail
+      currentForm, showPassword, loading, showForgotModal,
+      loginForm, registerForm, loginErrors, registerErrors, toast,
+      validateLoginField, validateRegisterField,
+      quickLogin, handleLogin, handleRegister
     }
   }
 }
 </script>
+
+<style scoped>
+.login-page {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, #0a0e17 0%, #1a1f2e 50%, #0d1321 100%);
+  position: relative;
+  overflow: hidden;
+}
+
+/* 网格背景 */
+.grid-bg {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-image: 
+    linear-gradient(rgba(0, 166, 255, 0.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0, 166, 255, 0.03) 1px, transparent 1px);
+  background-size: 50px 50px;
+  z-index: 1;
+}
+
+/* 粒子背景 */
+.particles-bg {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 2;
+  overflow: hidden;
+}
+
+.particle {
+  position: absolute;
+  width: 3px;
+  height: 3px;
+  background: #00a6ff;
+  border-radius: 50%;
+  opacity: 0;
+  animation: float-up 10s infinite;
+}
+
+.particle:nth-child(odd) { background: #00d4ff; width: 2px; height: 2px; }
+.particle:nth-child(3n) { background: #0088cc; width: 4px; height: 4px; }
+
+.particle:nth-child(1) { left: 5%; animation-delay: 0s; }
+.particle:nth-child(2) { left: 10%; animation-delay: 0.5s; }
+.particle:nth-child(3) { left: 15%; animation-delay: 1s; }
+.particle:nth-child(4) { left: 20%; animation-delay: 1.5s; }
+.particle:nth-child(5) { left: 25%; animation-delay: 2s; }
+.particle:nth-child(6) { left: 30%; animation-delay: 2.5s; }
+.particle:nth-child(7) { left: 35%; animation-delay: 3s; }
+.particle:nth-child(8) { left: 40%; animation-delay: 3.5s; }
+.particle:nth-child(9) { left: 45%; animation-delay: 4s; }
+.particle:nth-child(10) { left: 50%; animation-delay: 4.5s; }
+.particle:nth-child(11) { left: 55%; animation-delay: 5s; }
+.particle:nth-child(12) { left: 60%; animation-delay: 5.5s; }
+.particle:nth-child(13) { left: 65%; animation-delay: 6s; }
+.particle:nth-child(14) { left: 70%; animation-delay: 6.5s; }
+.particle:nth-child(15) { left: 75%; animation-delay: 7s; }
+.particle:nth-child(16) { left: 80%; animation-delay: 7.5s; }
+.particle:nth-child(17) { left: 85%; animation-delay: 8s; }
+.particle:nth-child(18) { left: 90%; animation-delay: 8.5s; }
+.particle:nth-child(19) { left: 95%; animation-delay: 9s; }
+.particle:nth-child(20) { left: 8%; animation-delay: 9.5s; }
+.particle:nth-child(n+21) { left: calc((var(--n, 1) - 20) * 5%); animation-delay: calc((var(--n, 1) - 20) * 0.3s); }
+
+@keyframes float-up {
+  0% { transform: translateY(100vh) scale(0); opacity: 0; }
+  10% { opacity: 0.8; }
+  90% { opacity: 0.8; }
+  100% { transform: translateY(-100vh) scale(1); opacity: 0; }
+}
+
+/* 光晕 */
+.glow-orb {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(80px);
+  z-index: 1;
+}
+
+.glow-1 {
+  width: 400px;
+  height: 400px;
+  background: rgba(0, 166, 255, 0.15);
+  top: -100px;
+  right: -100px;
+  animation: pulse-glow 4s infinite ease-in-out;
+}
+
+.glow-2 {
+  width: 300px;
+  height: 300px;
+  background: rgba(0, 212, 255, 0.1);
+  bottom: -50px;
+  left: -50px;
+  animation: pulse-glow 5s infinite ease-in-out reverse;
+}
+
+@keyframes pulse-glow {
+  0%, 100% { transform: scale(1); opacity: 0.5; }
+  50% { transform: scale(1.2); opacity: 0.8; }
+}
+
+/* 登录卡片 */
+.login-card {
+  position: relative;
+  z-index: 10;
+  width: 420px;
+  padding: 3rem 2.5rem;
+  background: rgba(20, 25, 35, 0.85);
+  border: 1px solid rgba(0, 166, 255, 0.2);
+  border-radius: 20px;
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  box-shadow: 
+    0 25px 50px rgba(0, 0, 0, 0.5),
+    0 0 100px rgba(0, 166, 255, 0.1),
+    inset 0 1px 0 rgba(255, 255, 255, 0.05);
+}
+
+.login-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: linear-gradient(90deg, transparent, #00a6ff, #00d4ff, #00a6ff, transparent);
+  border-radius: 20px 20px 0 0;
+}
+
+/* Logo */
+.login-logo {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+  margin-bottom: 0.5rem;
+}
+
+.login-logo i {
+  font-size: 2.5rem;
+  color: #00a6ff;
+  filter: drop-shadow(0 0 10px rgba(0, 166, 255, 0.5));
+}
+
+.login-logo h1 {
+  font-size: 2rem;
+  font-weight: 600;
+  background: linear-gradient(135deg, #00a6ff, #00d4ff);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.login-subtitle {
+  text-align: center;
+  color: #8b949e;
+  margin-bottom: 2rem;
+  font-size: 0.95rem;
+}
+
+/* 测试信息 */
+.test-info {
+  display: flex;
+  justify-content: center;
+  gap: 1.5rem;
+  padding: 0.75rem;
+  background: rgba(0, 166, 255, 0.1);
+  border: 1px solid rgba(0, 166, 255, 0.2);
+  border-radius: 8px;
+  margin-bottom: 1.5rem;
+  font-size: 0.85rem;
+  color: #00a6ff;
+}
+
+/* 输入框 */
+.input-field {
+  position: relative;
+  margin-bottom: 1.25rem;
+}
+
+.input-field.error input {
+  border-color: #ff4d4f;
+}
+
+.error-msg {
+  position: absolute;
+  bottom: -18px;
+  left: 0;
+  font-size: 12px;
+  color: #ff4d4f;
+}
+
+.input-field i {
+  position: absolute;
+  left: 1rem;
+  top: 50%;
+  transform: translateY(-50%);
+  color: #6a737d;
+  font-size: 1rem;
+  transition: color 0.3s;
+}
+
+.input-field input {
+  width: 100%;
+  padding: 1rem 3rem 1rem 3rem;
+  background: rgba(30, 37, 48, 0.8);
+  border: 1px solid rgba(46, 55, 70, 0.8);
+  border-radius: 10px;
+  color: #e1e4e8;
+  font-size: 1rem;
+  transition: all 0.3s;
+}
+
+.input-field input:focus {
+  outline: none;
+  border-color: #00a6ff;
+  box-shadow: 0 0 0 3px rgba(0, 166, 255, 0.15), 0 0 20px rgba(0, 166, 255, 0.1);
+}
+
+.input-field input:focus + i,
+.input-field input:focus ~ i {
+  color: #00a6ff;
+}
+
+.input-field input::placeholder {
+  color: #6a737d;
+}
+
+.eye-btn {
+  position: absolute;
+  right: 1rem;
+  top: 50%;
+  transform: translateY(-50%);
+  background: none;
+  border: none;
+  color: #6a737d;
+  cursor: pointer;
+  padding: 0.25rem;
+  transition: color 0.3s;
+}
+
+.eye-btn:hover {
+  color: #00a6ff;
+}
+
+/* 表单选项 */
+.form-options {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1.5rem;
+  font-size: 0.9rem;
+}
+
+.remember-me {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: #8b949e;
+  cursor: pointer;
+}
+
+.remember-me input {
+  accent-color: #00a6ff;
+}
+
+.form-options a {
+  color: #00a6ff;
+  text-decoration: none;
+  transition: color 0.3s;
+}
+
+.form-options a:hover {
+  color: #00d4ff;
+}
+
+/* 按钮 */
+.login-btn {
+  width: 100%;
+  padding: 1rem;
+  background: linear-gradient(135deg, #00a6ff, #0088cc);
+  border: none;
+  border-radius: 10px;
+  color: white;
+  font-size: 1.1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s;
+  position: relative;
+  overflow: hidden;
+}
+
+.login-btn::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
+  transition: left 0.5s;
+}
+
+.login-btn:hover::before {
+  left: 100%;
+}
+
+.login-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 10px 30px rgba(0, 166, 255, 0.4);
+}
+
+.login-btn:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.quick-login-btn {
+  width: 100%;
+  padding: 0.875rem;
+  margin-top: 0.75rem;
+  background: transparent;
+  border: 1px solid rgba(0, 166, 255, 0.5);
+  border-radius: 10px;
+  color: #00a6ff;
+  font-size: 1rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.3s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+}
+
+.quick-login-btn:hover {
+  background: rgba(0, 166, 255, 0.1);
+  border-color: #00a6ff;
+}
+
+/* 切换表单 */
+.switch-form {
+  text-align: center;
+  margin-top: 1.5rem;
+  color: #8b949e;
+  font-size: 0.95rem;
+}
+
+.switch-form a {
+  color: #00a6ff;
+  text-decoration: none;
+  font-weight: 500;
+  transition: color 0.3s;
+}
+
+.switch-form a:hover {
+  color: #00d4ff;
+}
+
+/* Toast通知 */
+.toast {
+  position: fixed;
+  top: 30px;
+  right: 30px;
+  padding: 1rem 1.5rem;
+  background: rgba(20, 25, 35, 0.95);
+  border: 1px solid rgba(0, 166, 255, 0.3);
+  border-radius: 10px;
+  color: #e1e4e8;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  transform: translateX(400px);
+  transition: transform 0.3s ease;
+  z-index: 1000;
+  backdrop-filter: blur(10px);
+}
+
+.toast.show {
+  transform: translateX(0);
+}
+
+.toast.success {
+  border-color: #00c087;
+}
+
+.toast.success i {
+  color: #00c087;
+}
+
+.toast.error {
+  border-color: #ff4d4f;
+}
+
+.toast.error i {
+  color: #ff4d4f;
+}
+
+/* 响应式 */
+@media (max-width: 480px) {
+  .login-card {
+    width: 90%;
+    padding: 2rem 1.5rem;
+  }
+  
+  .test-info {
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+}
+</style>

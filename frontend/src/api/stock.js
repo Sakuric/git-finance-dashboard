@@ -1,86 +1,75 @@
 import request from './request'
 
-// 获取股票列表
 export function getStockList(params) {
   return request({
-    url: '/stock/list',
+    url: '/stocks',
     method: 'get',
     params
   })
 }
 
-// 获取股票详情
 export function getStockDetail(stockCode) {
   return request({
-    url: `/stock/${stockCode}`,
+    url: `/stocks/${stockCode}`,
     method: 'get'
   })
 }
 
-// 获取股票实时数据
 export function getStockRealtime(stockCode) {
   return request({
-    url: `/stock/${stockCode}/realtime`,
+    url: `/test/sina/realtime/${stockCode}`,
     method: 'get'
   })
 }
 
-// 获取股票K线数据
 export function getStockKLine(stockCode, params) {
   return request({
-    url: `/stock/${stockCode}/kline`,
+    url: `/stock-data/kline/${stockCode}`,
     method: 'get',
     params
   })
 }
 
-// 获取股票分时数据
-export function getStockTimeline(stockCode) {
+export function getStockTimeline(stockCode, days = 30) {
   return request({
-    url: `/stock/${stockCode}/timeline`,
-    method: 'get'
+    url: `/stock-data/kline/${stockCode}/recent`,
+    method: 'get',
+    params: { days }
   })
 }
 
-// 获取自选股列表
-export function getWatchlist() {
+export function getWatchlist(userId) {
   return request({
-    url: '/stock/watchlist',
-    method: 'get'
+    url: '/favorites/list',
+    method: 'get',
+    params: { user_id: userId }
   })
 }
 
-// 添加自选股
-export function addToWatchlist(stockCode) {
+export function addToWatchlist(userId, stockCode, remark = '') {
   return request({
-    url: '/stock/watchlist/add',
+    url: '/favorites/add',
     method: 'post',
-    data: { stockCode }
+    params: { user_id: userId, stock_code: stockCode, remark }
   })
 }
 
-// 移除自选股
-export function removeFromWatchlist(stockCode) {
+export function removeFromWatchlist(userId, stockCode) {
   return request({
-    url: '/stock/watchlist/remove',
-    method: 'post',
-    data: { stockCode }
+    url: '/favorites/remove',
+    method: 'delete',
+    params: { user_id: userId, stock_code: stockCode }
   })
 }
 
-// 获取市场指数
 export function getMarketIndices() {
-  return request({
-    url: '/stock/indices',
-    method: 'get'
-  })
+  return Promise.reject(new Error('Market indices endpoint not implemented'))
 }
 
-// 搜索股票
 export function searchStock(keyword) {
   return request({
-    url: '/stock/search',
-    method: 'get',
-    params: { keyword }
+    url: '/stocks/query',
+    method: 'post',
+    data: { keyword }
   })
 }

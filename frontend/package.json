@@ -10,14 +10,15 @@
     "serve": "vite preview"
   },
   "dependencies": {
-    "vue": "^3.3.4",
-    "vue-router": "^4.2.4",
+    "axios": "^1.6.0",
     "echarts": "^5.4.3",
     "pinia": "^2.1.6",
-    "axios": "^1.6.0"
+    "vue": "^3.3.4",
+    "vue-router": "^4.2.4"
   },
   "devDependencies": {
     "@vitejs/plugin-vue": "^4.3.4",
+    "terser": "^5.44.1",
     "vite": "^4.4.9"
   },
   "keywords": [

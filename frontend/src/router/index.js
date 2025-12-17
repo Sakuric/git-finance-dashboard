@@ -9,7 +9,9 @@ const Market = () => import('@/views/Market.vue')
 const Watchlist = () => import('@/views/Watchlist.vue')
 const Advisor = () => import('@/views/Advisor.vue')
 const AiModels = () => import('@/views/AiModels.vue')
+const Backtest = () => import('@/views/Backtest.vue')
 const Settings = () => import('@/views/Settings.vue')
+const Preference = () => import('@/views/Preference.vue')
 
 const routes = [
   {
@@ -55,10 +57,22 @@ const routes = [
         meta: { title: 'AI模型管理' }
       },
       {
+        path: 'backtest',
+        name: 'Backtest',
+        component: Backtest,
+        meta: { title: '建议回测' }
+      },
+      {
         path: 'settings',
         name: 'Settings',
         component: Settings,
         meta: { title: '设置' }
+      },
+      {
+        path: 'preference',
+        name: 'Preference',
+        component: Preference,
+        meta: { title: '投资偏好' }
       }
     ]
   }
@@ -72,6 +86,9 @@ const router = createRouter({
 // 路由守卫
 router.beforeEach((to, from, next) => {
   const authStore = useAuthStore()
+  
+  // 确保认证状态已初始化
+  authStore.checkLoginStatus()
   
   if (to.meta.requiresAuth && !authStore.isLoggedIn) {
     next('/login')

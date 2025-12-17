@@ -14,83 +14,68 @@
     </header>
 
     <div class="content-grid">
+      <!-- 风险说明弹窗 -->
+      <div class="modal-overlay" v-if="showRiskModal" @click="showRiskModal = false">
+        <div class="modal-content" @click.stop>
+          <div class="modal-header">
+            <h3>风险承受能力说明</h3>
+            <button class="modal-close" @click="showRiskModal = false">×</button>
+          </div>
+          <div class="modal-body">
+            <div class="risk-item" v-for="level in riskLevels" :key="level.value">
+              <div class="risk-title">{{ level.code }} - {{ level.label }}</div>
+              <div class="risk-desc">{{ level.definition }}</div>
+              <div class="risk-loss">可接受亏损：{{ level.lossLevel }}</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
       <div class="card" style="grid-column: 1 / -1;">
         <div class="card-header">
           <h3>投资偏好设置</h3>
         </div>
         <div class="preference-settings">
-          <div class="preference-group">
-            <h4>风险承受能力</h4>
+          <div class="preference-group" :class="{ 'has-error': errors.risk }">
+            <h4>风险承受能力 <span class="required">*</span> <span class="info-icon" @click="showRiskModal = true" title="点击查看风险等级说明">ⓘ</span></h4>
             <div class="preference-options">
-              <label class="radio-option">
-                <input type="radio" name="risk" value="conservative" v-model="preferences.risk">
+              <label class="radio-option" v-for="level in riskLevels" :key="level.value">
+                <input type="radio" name="risk" :value="level.value" v-model="preferences.risk">
                 <span class="radio-check"></span>
-                <span class="radio-label">保守型</span>
-              </label>
-              <label class="radio-option">
-                <input type="radio" name="risk" value="balanced" v-model="preferences.risk">
-                <span class="radio-check"></span>
-                <span class="radio-label">稳健型</span>
-              </label>
-              <label class="radio-option">
-                <input type="radio" name="risk" value="aggressive" v-model="preferences.risk">
-                <span class="radio-check"></span>
-                <span class="radio-label">激进型</span>
+                <span class="radio-label">{{ level.label }} <small>{{ level.desc }}</small></span>
               </label>
             </div>
+            <span v-if="errors.risk" class="error-msg">{{ errors.risk }}</span>
           </div>
-          <div class="preference-group">
-            <h4>投资期限</h4>
+          <div class="preference-group" :class="{ 'has-error': errors.term }">
+            <h4>投资期限 <span class="required">*</span></h4>
             <div class="preference-options">
-              <label class="radio-option">
-                <input type="radio" name="term" value="short" v-model="preferences.term">
+              <label class="radio-option" v-for="term in investmentTerms" :key="term.value">
+                <input type="radio" name="term" :value="term.value" v-model="preferences.term">
                 <span class="radio-check"></span>
-                <span class="radio-label">短期 (3个月内)</span>
-              </label>
-              <label class="radio-option">
-                <input type="radio" name="term" value="medium" v-model="preferences.term">
-                <span class="radio-check"></span>
-                <span class="radio-label">中期 (3-12个月)</span>
-              </label>
-              <label class="radio-option">
-                <input type="radio" name="term" value="long" v-model="preferences.term">
-                <span class="radio-check"></span>
-                <span class="radio-label">长期 (1年以上)</span>
+                <span class="radio-label">{{ term.label }} <small>{{ term.desc }}</small></span>
               </label>
             </div>
+            <span v-if="errors.term" class="error-msg">{{ errors.term }}</span>
           </div>
-          <div class="preference-group">
-            <h4>关注行业</h4>
-            <div class="preference-options">
-              <label class="checkbox-option">
-                <input type="checkbox" value="tech" v-model="preferences.industries">
-                <span class="checkbox-check"></span>
-                <span class="checkbox-label">科技</span>
-              </label>
-              <label class="checkbox-option">
-                <input type="checkbox" value="finance" v-model="preferences.industries">
-                <span class="checkbox-check"></span>
-                <span class="checkbox-label">金融</span>
-              </label>
-              <label class="checkbox-option">
-                <input type="checkbox" value="healthcare" v-model="preferences.industries">
-                <span class="checkbox-check"></span>
-                <span class="checkbox-label">医疗</span>
-              </label>
-              <label class="checkbox-option">
-                <input type="checkbox" value="consumer" v-model="preferences.industries">
-                <span class="checkbox-check"></span>
-                <span class="checkbox-label">消费</span>
-              </label>
-              <label class="checkbox-option">
-                <input type="checkbox" value="energy" v-model="preferences.industries">
-                <span class="checkbox-check"></span>
-                <span class="checkbox-label">能源</span>
-              </label>
+          <div class="preference-group" :class="{ 'has-error': errors.industries }">
+            <h4>关注行业 <span class="required">*</span> <small class="selected-count">(已选 {{ preferences.industries.length }} 个，至少选1个)</small></h4>
+            <div class="industry-select-group">
+              <div v-for="category in industryCategories" :key="category.name" class="industry-category">
+                <div class="category-title">{{ category.name }}</div>
+                <div class="industry-options">
+                  <label v-for="industry in category.items" :key="industry" class="checkbox-option">
+                    <input type="checkbox" :value="industry" v-model="preferences.industries">
+                    <span class="checkbox-check"></span>
+                    <span class="checkbox-label">{{ industry }}</span>
+                  </label>
+                </div>
+              </div>
             </div>
+            <span v-if="errors.industries" class="error-msg">{{ errors.industries }}</span>
           </div>
-          <button class="auth-btn" style="margin-top: 1rem; align-self: flex-start;" @click="savePreferences">
-            <span class="btn-text">保存偏好设置</span>
+          <button class="auth-btn" style="margin-top: 1rem; align-self: flex-start;" @click="savePreferences" :disabled="saving">
+            <span class="btn-text">{{ saving ? '保存中...' : '保存偏好设置' }}</span>
           </button>
         </div>
       </div>
@@ -156,20 +141,53 @@
 </template>
 
 <script>
-import { ref, computed, onMounted, nextTick } from 'vue'
+import { ref, reactive, computed, onMounted, nextTick } from 'vue'
 import * as echarts from 'echarts'
+import { savePreference, getPreference } from '@/api/preference'
 
 export default {
   name: 'Advisor',
   setup() {
     const portfolioChart = ref(null)
     const activeFilter = ref('all')
+    const showRiskModal = ref(false)
+    const saving = ref(false)
 
     const preferences = ref({
-      risk: 'balanced',
-      term: 'medium',
-      industries: ['tech', 'finance', 'consumer']
+      risk: null,
+      term: '',
+      industries: []
     })
+
+    const errors = reactive({
+      risk: '',
+      term: '',
+      industries: ''
+    })
+
+    const industryCategories = [
+      { name: 'A. 大消费板块', items: ['食品饮料', '医药生物', '汽车', '家用电器', '农林牧渔', '纺织服饰', '轻工制造', '美容护理', '商贸零售', '社会服务'] },
+      { name: 'B. TMT/大科技板块', items: ['电子', '计算机', '通信', '传媒'] },
+      { name: 'C. 周期与资源板块', items: ['石油石化', '煤炭', '有色金属', '钢铁', '基础化工'] },
+      { name: 'D. 高端制造与新能源', items: ['电力设备', '机械设备', '国防军工'] },
+      { name: 'E. 大金融与地产', items: ['银行', '非银金融', '房地产'] },
+      { name: 'F. 基础设施与公用事业', items: ['公用事业', '交通运输', '建筑装饰', '建筑材料', '环保'] },
+      { name: 'G. 其他', items: ['综合'] }
+    ]
+
+    const riskLevels = [
+      { value: 1, code: 'C1', label: '保守型', desc: '不接受本金损失', definition: '首要目标是保持资产流动性和本金安全。对风险极度敏感，不愿承受本金损失。通常投资于银行存款、国债、货币基金等低风险产品。', lossLevel: '极低（不接受本金损失）' },
+      { value: 2, code: 'C2', label: '稳健型', desc: '可接受小幅波动', definition: '希望在保证本金安全的基础上获得高于通胀的收益。愿意承担较小的本金风险。投资组合以债券为主，辅以少量股票或混合型基金。', lossLevel: '较低（可接受小幅波动）' },
+      { value: 3, code: 'C3', label: '平衡型', desc: '可接受一定幅度亏损', definition: '在风险和收益之间寻求平衡。有一定的风险识别能力和承受能力。资金在股票、债券、现金之间均衡配置，追求中长期稳健增值。', lossLevel: '中等（可接受一定幅度的本金亏损）' },
+      { value: 4, code: 'C4', label: '积极型', desc: '可接受较大亏损', definition: '偏向于资产的增值，愿意承担较大的投资风险以换取较高的预期回报。主要投资于股票、偏股型基金等权益类资产。', lossLevel: '较高（可接受较大的本金亏损）' },
+      { value: 5, code: 'C5', label: '激进型', desc: '可接受本金全部亏损', definition: '追求资本的快速增值，风险承受能力极强。投资于股票、期货、期权、外汇等高波动产品，甚至使用杠杆。', lossLevel: '极高（可接受本金全部亏损甚至更多）' }
+    ]
+
+    const investmentTerms = [
+      { value: '短期1-6月', label: '短期（1-6个月）', desc: '1-6个月' },
+      { value: '短期6-12月', label: '短期（6-12个月）', desc: '6-12个月' },
+      { value: '长期', label: '长期', desc: '1年以上' }
+    ]
 
     const filters = [
       { label: '全部', value: 'all' },
@@ -330,21 +348,76 @@ export default {
       window.addEventListener('resize', () => portfolioChart.value.resize())
     }
 
+    // 表单校验
+    const validateForm = () => {
+      let valid = true
+      errors.risk = ''
+      errors.term = ''
+      errors.industries = ''
+
+      if (!preferences.value.risk) {
+        errors.risk = '请选择风险承受能力'
+        valid = false
+      }
+      if (!preferences.value.term) {
+        errors.term = '请选择投资期限'
+        valid = false
+      }
+      if (preferences.value.industries.length === 0) {
+        errors.industries = '请至少选择一个关注行业'
+        valid = false
+      }
+      return valid
+    }
+
     // 保存偏好设置
-    const savePreferences = () => {
-      console.log('保存偏好设置:', preferences.value)
-      // 这里可以添加保存到后端的逻辑
-      alert('偏好设置已保存')
+    const savePreferences = async () => {
+      if (!validateForm()) return
+      
+      saving.value = true
+      try {
+        await savePreference({
+          riskToleranceLevel: preferences.value.risk,
+          investmentHorizon: preferences.value.term,
+          preferredIndustry: preferences.value.industries.join(',')
+        })
+        alert('偏好设置保存成功')
+      } catch (e) {
+        alert('保存失败: ' + (e.message || '网络错误'))
+      } finally {
+        saving.value = false
+      }
+    }
+
+    // 加载用户偏好
+    const loadPreferences = async () => {
+      try {
+        const res = await getPreference()
+        if (res.data) {
+          preferences.value.risk = res.data.riskToleranceLevel || null
+          preferences.value.term = res.data.investmentHorizon || ''
+          preferences.value.industries = res.data.preferredIndustry ? res.data.preferredIndustry.split(',') : []
+        }
+      } catch (e) {
+        console.error('加载偏好失败', e)
+      }
     }
 
     onMounted(() => {
+      loadPreferences()
       nextTick(() => {
         initPortfolioChart()
       })
     })
 
     return {
+      showRiskModal,
       preferences,
+      errors,
+      saving,
+      riskLevels,
+      investmentTerms,
+      industryCategories,
       filters,
       activeFilter,
       filteredAdvices,
@@ -353,3 +426,125 @@ export default {
   }
 }
 </script>
+
+<style scoped>
+.info-icon {
+  cursor: pointer;
+  color: #00AFFF;
+  font-size: 16px;
+  margin-left: 8px;
+}
+.info-icon:hover { color: #58a6ff; }
+
+.modal-overlay {
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(0, 0, 0, 0.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+.modal-content {
+  background: #161B22;
+  border: 1px solid #30363D;
+  border-radius: 12px;
+  max-width: 700px;
+  max-height: 80vh;
+  overflow-y: auto;
+  width: 90%;
+}
+.modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px 20px;
+  border-bottom: 1px solid #30363D;
+}
+.modal-header h3 { margin: 0; color: #C9D1D9; }
+.modal-close {
+  background: none;
+  border: none;
+  color: #8B949E;
+  font-size: 24px;
+  cursor: pointer;
+}
+.modal-close:hover { color: #C9D1D9; }
+.modal-body { padding: 20px; }
+
+.risk-item {
+  padding: 15px;
+  border: 1px solid #30363D;
+  border-radius: 8px;
+  margin-bottom: 12px;
+}
+.risk-item:last-child { margin-bottom: 0; }
+.risk-title { color: #00AFFF; font-weight: 600; margin-bottom: 8px; }
+.risk-desc { color: #C9D1D9; font-size: 14px; line-height: 1.6; margin-bottom: 8px; }
+.risk-loss { color: #F85149; font-size: 13px; }
+
+.radio-label small {
+  display: block;
+  color: #8B949E;
+  font-size: 12px;
+  margin-top: 2px;
+}
+
+.selected-count { color: #00AFFF; font-weight: normal; font-size: 12px; }
+
+.industry-select-group {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  max-height: 400px;
+  overflow-y: auto;
+  padding: 12px;
+  background: #0D1117;
+  border: 1px solid #30363D;
+  border-radius: 8px;
+}
+
+.industry-category { margin-bottom: 8px; }
+.category-title { color: #C9D1D9; font-weight: 600; font-size: 13px; margin-bottom: 8px; }
+
+.industry-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.checkbox-option {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  padding: 6px 10px;
+  background: #161B22;
+  border: 1px solid #30363D;
+  border-radius: 6px;
+  transition: all 0.2s;
+}
+.checkbox-option:hover { border-color: #00AFFF; }
+.checkbox-option input { display: none; }
+.checkbox-option input:checked + .checkbox-check { background: #00AFFF; border-color: #00AFFF; }
+.checkbox-option input:checked + .checkbox-check::after { content: '✓'; color: #fff; font-size: 10px; }
+.checkbox-option input:checked ~ .checkbox-label { color: #00AFFF; }
+
+.checkbox-check {
+  width: 16px;
+  height: 16px;
+  border: 2px solid #30363D;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+}
+
+.checkbox-label { color: #8B949E; font-size: 13px; }
+
+.required { color: #F85149; }
+.error-msg { color: #F85149; font-size: 12px; margin-top: 6px; display: block; }
+.has-error .industry-select-group { border-color: #F85149; }
+.auth-btn:disabled { opacity: 0.6; cursor: not-allowed; }
+</style>

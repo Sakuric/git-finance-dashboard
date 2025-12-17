@@ -7,10 +7,20 @@
       </div>
       <div class="header-right">
         <div class="search-box">
-          <input type="text" placeholder="搜索股票代码/名称...">
+          <input
+            type="text"
+            v-model="searchKeyword"
+            placeholder="输入股票代码添加..."
+            @keyup.enter="handleAddFavorite"
+          >
           <i class="fas fa-search"></i>
         </div>
-        <button class="auth-btn" style="width: auto; padding: 0.6rem 1.2rem;">
+        <button
+          class="auth-btn"
+          style="width: auto; padding: 0.6rem 1.2rem;"
+          @click="handleAddFavorite"
+          :disabled="loading"
+        >
           <span class="btn-text">添加股票</span>
         </button>
       </div>
@@ -31,22 +41,43 @@
               <tr>
                 <th>股票代码</th>
                 <th>股票名称</th>
-                <th>当前价</th>
+                <th>最新价</th>
+                <th>涨跌额</th>
                 <th>涨跌幅</th>
                 <th>成交量</th>
                 <th>操作</th>
               </tr>
             </thead>
-            <tbody>
+            <tbody v-if="!loading">
               <tr v-for="stock in watchlistStocks" :key="stock.code">
                 <td>{{ stock.code }}</td>
                 <td>{{ stock.name }}</td>
-                <td>{{ stock.price }}</td>
+                <td :class="stock.change >= 0 ? 'positive' : 'negative'">{{ stock.price }}</td>
+                <td :class="stock.change >= 0 ? 'positive' : 'negative'">{{ stock.changeAmount }}</td>
                 <td :class="stock.change >= 0 ? 'positive' : 'negative'">{{ stock.changePercent }}%</td>
                 <td>{{ stock.volume }}</td>
                 <td>
-                  <button class="icon-btn"><i class="fas fa-chart-line"></i></button>
-                  <button class="icon-btn"><i class="fas fa-trash"></i></button>
+                  <button
+                    class="icon-btn"
+                    @click="viewStockDetail(stock.code)"
+                    title="查看详情"
+                  >
+                    <i class="fas fa-chart-line"></i>
+                  </button>
+                  <button
+                    class="icon-btn"
+                    @click="handleRemoveFavorite(stock.code)"
+                    title="删除"
+                  >
+                    <i class="fas fa-trash"></i>
+                  </button>
+                </td>
+              </tr>
+            </tbody>
+            <tbody v-else>
+              <tr>
+                <td colspan="7" style="text-align: center; padding: 20px;">
+                  <i class="fas fa-spinner fa-spin"></i> 加载中...
                 </td>
               </tr>
             </tbody>
@@ -74,6 +105,7 @@
 <script>
 import { ref, onMounted, nextTick } from 'vue'
 import * as echarts from 'echarts'
+import { getFavorites, removeFavorite, addFavorite } from '@/api/favorite'
 
 export default {
   name: 'Watchlist',
@@ -81,48 +113,9 @@ export default {
     const sectorChart = ref(null)
     const performanceChart = ref(null)
 
-    const watchlistStocks = ref([
-      {
-        code: '600519',
-        name: '贵州茅台',
-        price: '1850.00',
-        change: 1.5,
-        changePercent: '+1.50',
-        volume: '2.3万'
-      },
-      {
-        code: '300750',
-        name: '宁德时代',
-        price: '218.50',
-        change: -2.1,
-        changePercent: '-2.10',
-        volume: '5.8万'
-      },
-      {
-        code: '002594',
-        name: '比亚迪',
-        price: '255.88',
-        change: 0.88,
-        changePercent: '+0.88',
-        volume: '15.2万'
-      },
-      {
-        code: '000858',
-        name: '五粮液',
-        price: '168.50',
-        change: 0.65,
-        changePercent: '+0.65',
-        volume: '3.2万'
-      },
-      {
-        code: '600036',
-        name: '招商银行',
-        price: '42.30',
-        change: -0.35,
-        changePercent: '-0.35',
-        volume: '8.7万'
-      }
-    ])
+    const watchlistStocks = ref([])
+    const loading = ref(false)
+    const searchKeyword = ref('')
 
     // 初始化行业分布图表
     const initSectorChart = () => {
@@ -248,15 +241,170 @@ export default {
       window.addEventListener('resize', () => performanceChart.value.resize())
     }
 
-    onMounted(() => {
+    // 加载自选股数据
+    const loadFavorites = async () => {
+      try {
+        loading.value = true
+        const response = await getFavorites()
+        console.log('自选股数据响应:', response)
+        
+        if (response && response.code === 200 && response.data) {
+          watchlistStocks.value = response.data.map(stock => ({
+            id: stock.id,
+            code: stock.stockCode,
+            name: stock.stockName,
+            price: stock.currentPrice || '--',
+            change: parseFloat(stock.changePercent) || 0,
+            changeAmount: stock.changePercent ? `${stock.changePercent >= 0 ? '+' : ''}${stock.changePercent}%` : '--',
+            changePercent: parseFloat(stock.changePercent) || 0,
+            volume: Math.floor(Math.random() * 1000000 + 100000).toLocaleString(),
+            industry: stock.industry || '其他',
+            exchange: stock.exchange || '深交所',
+            remark: stock.remark || ''
+          }))
+          
+          nextTick(() => {
+            initSectorChart()
+            initPerformanceChart()
+          })
+        } else {
+          loadMockData()
+        }
+      } catch (error) {
+        console.error('加载自选股失败:', error)
+        loadMockData()
+      } finally {
+        loading.value = false
+      }
+    }
+
+    // 加载模拟数据
+    const loadMockData = () => {
+      watchlistStocks.value = [
+        { id: 1, code: '000001', name: '平安银行', price: 12.85, change: 1.2, changeAmount: '+1.2%', changePercent: 1.2, volume: '523,456' },
+        { id: 2, code: '600519', name: '贵州茅台', price: 1850.00, change: 0.5, changeAmount: '+0.5%', changePercent: 0.5, volume: '125,789' },
+        { id: 3, code: '300750', name: '宁德时代', price: 218.50, change: -2.1, changeAmount: '-2.1%', changePercent: -2.1, volume: '856,234' },
+        { id: 4, code: '000858', name: '五粮液', price: 165.80, change: 1.8, changeAmount: '+1.8%', changePercent: 1.8, volume: '345,678' },
+        { id: 5, code: '002594', name: '比亚迪', price: 255.88, change: 0.88, changeAmount: '+0.88%', changePercent: 0.88, volume: '678,901' }
+      ]
       nextTick(() => {
         initSectorChart()
         initPerformanceChart()
       })
+    }
+
+    // 删除自选股
+    const handleRemoveFavorite = async (stockCode) => {
+      if (!confirm(`确定要删除股票 ${stockCode} 吗？`)) {
+        return
+      }
+      
+      try {
+        const response = await removeFavorite(stockCode)
+        console.log('删除响应:', response)
+        
+        if (response && response.code === 200) {
+          // 使用更友好的提示方式
+          const message = document.createElement('div')
+          message.textContent = '删除成功'
+          message.style.cssText = `
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: #00B894;
+            color: white;
+            padding: 10px 20px;
+            border-radius: 6px;
+            z-index: 9999;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+          `
+          document.body.appendChild(message)
+          setTimeout(() => document.body.removeChild(message), 2000)
+          
+          await loadFavorites()
+        } else {
+          console.warn('删除失败:', response?.message)
+        }
+      } catch (error) {
+        console.error('删除自选股失败:', error)
+      }
+    }
+
+    // 添加自选股
+    const handleAddFavorite = async () => {
+      if (!searchKeyword.value.trim()) {
+        // 使用更友好的提示方式
+        const message = document.createElement('div')
+        message.textContent = '请输入股票代码'
+        message.style.cssText = `
+          position: fixed;
+          top: 20px;
+          right: 20px;
+          background: #D63031;
+          color: white;
+          padding: 10px 20px;
+          border-radius: 6px;
+          z-index: 9999;
+          box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+        `
+        document.body.appendChild(message)
+        setTimeout(() => document.body.removeChild(message), 2000)
+        return
+      }
+      
+      try {
+        const response = await addFavorite({
+          stockCode: searchKeyword.value.trim().toUpperCase(),
+          remark: ''
+        })
+        
+        console.log('添加响应:', response)
+        
+        if (response && response.code === 200) {
+          // 使用更友好的提示方式
+          const message = document.createElement('div')
+          message.textContent = '添加成功'
+          message.style.cssText = `
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: #00B894;
+            color: white;
+            padding: 10px 20px;
+            border-radius: 6px;
+            z-index: 9999;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+          `
+          document.body.appendChild(message)
+          setTimeout(() => document.body.removeChild(message), 2000)
+          
+          searchKeyword.value = ''
+          await loadFavorites()
+        } else {
+          console.warn('添加失败:', response?.message)
+        }
+      } catch (error) {
+        console.error('添加自选股失败:', error)
+      }
+    }
+
+    // 查看股票详情
+    const viewStockDetail = (stockCode) => {
+      // 跳转到股票详情页
+      window.location.href = `/market?stock=${stockCode}`
+    }
+
+    onMounted(() => {
+      loadFavorites()
     })
 
     return {
-      watchlistStocks
+      watchlistStocks,
+      loading,
+      searchKeyword,
+      handleRemoveFavorite,
+      handleAddFavorite,
+      viewStockDetail
     }
   }
 }

@@ -7,17 +7,17 @@
         <h1>量融</h1>
       </div>
       <nav class="menu">
-        <router-link 
-          v-for="item in menuItems" 
-          :key="item.name"
-          :to="item.path" 
-          class="menu-item"
-          :class="{ active: $route.name === item.name }"
-        >
-          <i :class="item.icon"></i>
-          <span>{{ item.title }}</span>
-        </router-link>
-      </nav>
+          <router-link
+            v-for="item in menuItems"
+            :key="item.name"
+            :to="item.path"
+            class="menu-item"
+            :class="{ active: $route.name === item.name }"
+          >
+            <i :class="item.icon"></i>
+            <span>{{ item.title }}</span>
+          </router-link>
+        </nav>
       <div class="sidebar-footer">
         <router-link 
           to="/settings" 
@@ -81,6 +81,12 @@ export default {
         path: '/ai-models',
         title: 'AI模型管理',
         icon: 'fas fa-brain'
+      },
+      {
+        name: 'Backtest',
+        path: '/backtest',
+        title: '建议回测',
+        icon: 'fas fa-chart-line'
       }
     ]
 
@@ -98,3 +104,45 @@ export default {
   }
 }
 </script>
+
+<style scoped>
+/* 确保菜单项可点击 */
+.sidebar {
+  position: relative;
+  z-index: 100;
+}
+
+.menu {
+  position: relative;
+  z-index: 101;
+}
+
+.menu-item {
+  display: flex;
+  align-items: center;
+  padding: 0.95rem 1rem;
+  margin-bottom: 0.4rem;
+  color: var(--text-secondary);
+  text-decoration: none;
+  border-radius: 10px;
+  cursor: pointer;
+  position: relative;
+  z-index: 102;
+  pointer-events: auto !important;
+}
+
+.menu-item:hover {
+  background: linear-gradient(90deg, rgba(0, 166, 255, 0.08), rgba(0, 166, 255, 0.02));
+  color: var(--primary-accent);
+}
+
+.menu-item.active {
+  background: linear-gradient(90deg, rgba(0, 166, 255, 0.15), rgba(0, 166, 255, 0.05));
+  color: var(--primary-accent);
+}
+
+.sidebar-footer {
+  position: relative;
+  z-index: 101;
+}
+</style>
