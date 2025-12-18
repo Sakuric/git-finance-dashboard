@@ -37,13 +37,39 @@ public class EastMoneyApiService {
         return null;
     }
 
+    public String fetchStockQuote(String stockCode) {
+        String secid = convertToSecid(stockCode);
+        String url = String.format(
+            "https://push2.eastmoney.com/api/qt/stock/get?secid=%s&fields=f43,f168,f162,f116,f117",
+            secid
+        );
+
+        Request request = new Request.Builder()
+            .url(url)
+            .addHeader("User-Agent", "Mozilla/5.0")
+            .addHeader("Referer", "https://quote.eastmoney.com/")
+            .build();
+
+        try (Response response = okHttpClient.newCall(request).execute()) {
+            if (response.isSuccessful() && response.body() != null) {
+                String body = response.body().string();
+                log.info("东方财富API响应: {}", body);
+                return body;
+            }
+            log.error("东方财富API请求失败: code={}", response.code());
+        } catch (Exception e) {
+            log.error("获取东方财富行情失败: {}", stockCode, e);
+        }
+        return null;
+    }
+
     private String convertToSecid(String code) {
         if (code.startsWith("sh") || code.startsWith("sz")) {
             code = code.substring(2);
         }
-        if (code.startsWith("399") || code.startsWith("159")) {
-            return "0." + code;
+        if (code.startsWith("6")) {
+            return "1." + code;
         }
-        return "1." + code;
+        return "0." + code;
     }
 }

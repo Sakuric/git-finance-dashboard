@@ -142,6 +142,7 @@
 
 <script>
 import { ref, reactive, computed, onMounted, nextTick } from 'vue'
+import { useRouter } from 'vue-router'
 import * as echarts from 'echarts'
 import { savePreference, getPreference } from '@/api/preference'
 import { useAuthStore } from '@/stores/auth'
@@ -150,6 +151,7 @@ export default {
   name: 'Advisor',
   setup() {
     const authStore = useAuthStore()
+    const router = useRouter()
     const portfolioChart = ref(null)
     const activeFilter = ref('all')
     const showRiskModal = ref(false)
@@ -166,6 +168,16 @@ export default {
       term: '',
       industries: ''
     })
+
+    const ensureUserId = () => {
+      const uid = Number(authStore.userId || 0)
+      if (!uid) {
+        alert('登录信息已失效，请重新登录')
+        router.push('/login')
+        return null
+      }
+      return uid
+    }
 
     const industryCategories = [
       { name: 'A. 大消费板块', items: ['食品饮料', '医药生物', '汽车', '家用电器', '农林牧渔', '纺织服饰', '轻工制造', '美容护理', '商贸零售', '社会服务'] },
@@ -375,11 +387,13 @@ export default {
     // 保存偏好设置
     const savePreferences = async () => {
       if (!validateForm()) return
+      const uid = ensureUserId()
+      if (!uid) return
 
       saving.value = true
       try {
         await savePreference({
-          userId: authStore.userId,
+          userId: uid,
           riskToleranceLevel: preferences.value.risk,
           investmentHorizonType: 'preset',
           investmentHorizonPreset: preferences.value.term,
@@ -388,7 +402,8 @@ export default {
         })
         alert('偏好设置保存成功')
       } catch (e) {
-        alert('保存失败: ' + (e.message || '网络错误'))
+        const msg = e?.response?.data?.message || e.message || '网络错误'
+        alert('保存失败: ' + msg)
       } finally {
         saving.value = false
       }
@@ -396,8 +411,10 @@ export default {
 
     // 加载用户偏好
     const loadPreferences = async () => {
+      const uid = ensureUserId()
+      if (!uid) return
       try {
-        const res = await getPreference(authStore.userId)
+        const res = await getPreference(uid)
         if (res.data) {
           preferences.value.risk = res.data.riskToleranceLevel || null
           preferences.value.term = res.data.investmentHorizonPreset || ''

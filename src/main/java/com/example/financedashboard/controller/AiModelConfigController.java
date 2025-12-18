@@ -21,8 +21,9 @@ public class AiModelConfigController {
     private final AiModelConfigMapper modelConfigMapper;
 
     @GetMapping("/user/{userId}")
-    public List<AiModelConfig> getUserModels(@PathVariable Long userId) {
-        return modelConfigMapper.findByUserId(userId);
+    public Map<String, Object> getUserModels(@PathVariable Long userId) {
+        List<AiModelConfig> models = modelConfigMapper.findByUserId(userId);
+        return Map.of("code", 200, "data", models);
     }
 
     @PostMapping
@@ -75,6 +76,47 @@ public class AiModelConfigController {
     public Map<String, String> deleteModel(@PathVariable Long id) {
         modelConfigMapper.deleteById(id);
         return Map.of("message", "删除成功");
+    }
+
+    @PostMapping("/test")
+    public Map<String, Object> testApiKey(@RequestBody TestRequest request) {
+        try {
+            okhttp3.OkHttpClient client = new okhttp3.OkHttpClient.Builder()
+                    .readTimeout(10, java.util.concurrent.TimeUnit.SECONDS)
+                    .build();
+
+            String testBody = "{\"model\":\"" + (request.getModelName() != null ? request.getModelName() : "gpt-3.5-turbo") +
+                    "\",\"messages\":[{\"role\":\"user\",\"content\":\"test\"}],\"max_tokens\":5}";
+
+            okhttp3.RequestBody body = okhttp3.RequestBody.create(
+                    testBody,
+                    okhttp3.MediaType.parse("application/json")
+            );
+
+            okhttp3.Request httpRequest = new okhttp3.Request.Builder()
+                    .url(request.getApiUrl() + "/chat/completions")
+                    .addHeader("Authorization", "Bearer " + request.getApiKey())
+                    .addHeader("Content-Type", "application/json")
+                    .post(body)
+                    .build();
+
+            try (okhttp3.Response response = client.newCall(httpRequest).execute()) {
+                if (response.isSuccessful()) {
+                    return Map.of("success", true, "message", "API密钥验证成功");
+                } else {
+                    return Map.of("success", false, "message", "API密钥验证失败: " + response.code());
+                }
+            }
+        } catch (Exception e) {
+            return Map.of("success", false, "message", "连接失败: " + e.getMessage());
+        }
+    }
+
+    @Data
+    static class TestRequest {
+        private String apiKey;
+        private String apiUrl;
+        private String modelName;
     }
 
     @Data

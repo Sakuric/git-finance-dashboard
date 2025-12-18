@@ -24,13 +24,14 @@ public class StockController {
     }
 
     @GetMapping("/{stockCode}")
-    public Result<StockInfo> getStockByCode(@PathVariable String stockCode) {
+    public Result<StockInfo> getStockByCode(@PathVariable String stockCode, HttpServletRequest request) {
         StockInfo stockInfo = stockService.getStockByCode(stockCode);
-        if (stockInfo != null) {
-            return Result.success(stockInfo);
-        } else {
-            return Result.error(404, "股票不存在");
+        if (stockInfo == null) {
+            stockInfo = new StockInfo();
+            stockInfo.setStockCode(stockCode);
+            stockInfo.setStockName(stockCode);
         }
+        return Result.success(stockInfo);
     }
 
     @PostMapping

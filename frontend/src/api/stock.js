@@ -91,3 +91,10 @@ export function searchStock(keyword) {
     data: { keyword }
   })
 }
+
+export function getEastMoneyQuote(stockCode) {
+  return request({
+    url: `/eastmoney/quote/${stockCode}`,
+    method: 'get'
+  })
+}

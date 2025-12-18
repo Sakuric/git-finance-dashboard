@@ -12,7 +12,8 @@
       "Bash(mvn clean compile:*)",
       "Bash(mvn spring-boot:run:*)",
       "Bash(taskkill:*)",
-      "Bash(mysql:*)"
+      "Bash(mysql:*)",
+      "Bash(timeout:*)"
     ]
   }
 }

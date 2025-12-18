@@ -224,7 +224,7 @@
 
 <script>
 import { ref, reactive, computed, onMounted } from 'vue'
-import { getAiPlatforms, saveAiPlatform, updateAiPlatform, deleteAiPlatform } from '@/api/aiPlatform'
+import { getAiPlatforms, saveAiPlatform, updateAiPlatform, deleteAiPlatform, testApiKey as testApiKeyApi } from '@/api/aiPlatform'
 
 export default {
   name: 'AiModels',
@@ -263,8 +263,9 @@ export default {
 
     const loadPlatforms = async () => {
       try {
-        const res = await getAiPlatforms()
-        if (res.code === 200 && res.data) {
+        const userId = localStorage.getItem('userId') || 1
+        const res = await getAiPlatforms(userId)
+        if (res && res.data) {
           customPlatforms.value = res.data
           platforms.value = [
             ...defaultPlatforms,
@@ -487,8 +488,29 @@ export default {
       }
     }
 
-    const testApiKey = () => {
-      alert('API密钥检测中...')
+    const testApiKey = async () => {
+      if (!apiKey.value.trim()) {
+        alert('请先输入API密钥')
+        return
+      }
+      if (!apiUrl.value.trim()) {
+        alert('请先输入API地址')
+        return
+      }
+      try {
+        const res = await testApiKeyApi({
+          apiKey: apiKey.value,
+          apiUrl: apiUrl.value,
+          modelName: selectedModel.value?.name || 'gpt-3.5-turbo'
+        })
+        if (res.success) {
+          alert('✅ ' + res.message)
+        } else {
+          alert('❌ ' + res.message)
+        }
+      } catch (e) {
+        alert('❌ 检测失败: ' + (e.response?.data?.message || e.message || '网络错误'))
+      }
     }
 
     const selectModel = (model) => {

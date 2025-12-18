@@ -123,7 +123,7 @@
 import { ref, watch, onMounted, onBeforeUnmount, nextTick } from 'vue'
 import { useRoute } from 'vue-router'
 import * as echarts from 'echarts'
-import { getStockDetail, getStockRealtime, getStockTimeline, getStockKLine } from '@/api/stock'
+import { getStockDetail, getStockRealtime, getStockTimeline, getStockKLine, getEastMoneyQuote } from '@/api/stock'
 
 export default {
   name: 'Market',
@@ -289,16 +289,10 @@ export default {
 
       timelineChart.value = echarts.init(chartDom)
 
-      let priceData, volumeData
       const built = buildTimelineFromApi(apiTimeline.value)
-      if (built) {
-        priceData = built.priceData
-        volumeData = built.volumeData
-      } else {
-        const fallback = generateTimelineData()
-        priceData = fallback.priceData
-        volumeData = fallback.volumeData
-      }
+      if (!built) return
+      const priceData = built.priceData
+      const volumeData = built.volumeData
       
       const option = {
         backgroundColor: 'transparent',
@@ -427,7 +421,8 @@ export default {
       }
 
       klineChart.value = echarts.init(chartDom)
-      const rawData = buildKLineFromApi(apiKline.value) || generateKLineData(200)
+      const rawData = buildKLineFromApi(apiKline.value)
+      if (!rawData) return
       const dates = rawData.map(item => item.time)
       const kData = rawData.map(item => item.k)
       const volumes = rawData.map((item, index) => [index, item.volume, item.k[1] > item.k[0] ? 1 : -1])
@@ -520,40 +515,44 @@ export default {
     const loadStockData = async () => {
       loading.value = true
       try {
-        const [detailRes, timelineRes, klineRes] = await Promise.all([
-          getStockDetail(stockCode.value),
+        const [realtimeRes, timelineRes, klineRes, eastmoneyRes] = await Promise.all([
+          getStockRealtime(stockCode.value),
           getStockTimeline(stockCode.value, 30),
-          getStockKLine(stockCode.value, { days: 200 })
+          getStockKLine(stockCode.value, { days: 200 }),
+          getEastMoneyQuote(stockCode.value)
         ])
 
-        if (detailRes?.code === 200 && detailRes.data) {
-          const detail = detailRes.data
+        if (timelineRes?.code === 200 && Array.isArray(timelineRes.data) && timelineRes.data.length > 0) {
+          apiTimeline.value = timelineRes.data
+          const latest = timelineRes.data[timelineRes.data.length - 1]
+          const realtime = realtimeRes?.code === 200 ? realtimeRes.data : null
+
           stockData.value = {
-            name: detail.stockName || stockData.value.name,
-            code: detail.stockCode || stockCode.value,
-            exchange: detail.exchange || stockData.value.exchange,
-            price: (detail.currentPrice || '--').toString(),
-            change: (detail.changePercent || detail.change || '--').toString(),
-            changePercent: (detail.changePercent || '--').toString()
+            name: realtime?.stockName || latest.stockName || stockCode.value,
+            code: stockCode.value,
+            exchange: stockCode.value.startsWith('6') ? '上交所' : '深交所',
+            price: realtime ? Number(realtime.currentPrice || 0).toFixed(2) : Number(latest.closePrice || 0).toFixed(2),
+            change: realtime ? Number(realtime.change || 0).toFixed(2) : Number(latest.changeAmount || 0).toFixed(2),
+            changePercent: realtime ? Number(realtime.changePercent || 0).toFixed(2) : Number(latest.changePercent || 0).toFixed(2)
           }
+
+          const eastmoney = eastmoneyRes?.code === 200 ? eastmoneyRes.data : null
+
           keyMetrics.value = [
-            { label: '高', value: detail.highPrice || '--', class: '' },
-            { label: '低', value: detail.lowPrice || '--', class: '' },
-            { label: '开', value: detail.openPrice || '--', class: '' },
-            { label: '昨收', value: detail.yesterdayClose || '--', class: '' },
-            { label: '量', value: detail.volume || '--', class: '' },
-            { label: '额', value: detail.amount || '--', class: '' },
-            { label: '换手', value: detail.turnoverRate ? `${detail.turnoverRate}%` : '--', class: '' },
-            { label: '市盈', value: detail.pe || '--', class: '' },
-            { label: '总市值', value: detail.totalMarketCap || '--', class: '' },
-            { label: '流通值', value: detail.totalMarketCap || '--', class: '' }
+            { label: '高', value: realtime ? Number(realtime.highPrice || 0).toFixed(2) : Number(latest.highPrice || 0).toFixed(2), class: '' },
+            { label: '低', value: realtime ? Number(realtime.lowPrice || 0).toFixed(2) : Number(latest.lowPrice || 0).toFixed(2), class: '' },
+            { label: '开', value: realtime ? Number(realtime.openPrice || 0).toFixed(2) : Number(latest.openPrice || 0).toFixed(2), class: '' },
+            { label: '昨收', value: realtime ? Number(realtime.preClosePrice || 0).toFixed(2) : '--', class: '' },
+            { label: '量', value: realtime ? (realtime.volume / 100).toFixed(2) + '万手' : (latest.volume ? (latest.volume / 10000).toFixed(2) + '万手' : '--'), class: '' },
+            { label: '额', value: realtime ? (realtime.amount / 100000000).toFixed(2) + '亿' : (latest.amount ? (latest.amount / 100000000).toFixed(2) + '亿' : '--'), class: '' },
+            { label: '换手', value: eastmoney?.turnoverRate ? eastmoney.turnoverRate.toFixed(2) + '%' : '--', class: '' },
+            { label: '市盈', value: eastmoney?.pe ? eastmoney.pe.toFixed(2) : '--', class: '' },
+            { label: '总市值', value: eastmoney?.totalMarketCap ? (eastmoney.totalMarketCap / 100000000).toFixed(2) + '亿' : '--', class: '' },
+            { label: '流通值', value: eastmoney?.circulationMarketCap ? (eastmoney.circulationMarketCap / 100000000).toFixed(2) + '亿' : '--', class: '' }
           ]
-          generateOrderBook(detail.currentPrice)
+          generateOrderBook(realtime?.currentPrice || latest.closePrice)
         }
 
-        if (timelineRes?.code === 200 && Array.isArray(timelineRes.data)) {
-          apiTimeline.value = timelineRes.data
-        }
         if (klineRes?.code === 200 && Array.isArray(klineRes.data)) {
           apiKline.value = klineRes.data
         }
