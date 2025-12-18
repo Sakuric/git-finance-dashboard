@@ -144,10 +144,12 @@
 import { ref, reactive, computed, onMounted, nextTick } from 'vue'
 import * as echarts from 'echarts'
 import { savePreference, getPreference } from '@/api/preference'
+import { useAuthStore } from '@/stores/auth'
 
 export default {
   name: 'Advisor',
   setup() {
+    const authStore = useAuthStore()
     const portfolioChart = ref(null)
     const activeFilter = ref('all')
     const showRiskModal = ref(false)
@@ -373,12 +375,15 @@ export default {
     // 保存偏好设置
     const savePreferences = async () => {
       if (!validateForm()) return
-      
+
       saving.value = true
       try {
         await savePreference({
+          userId: authStore.userId,
           riskToleranceLevel: preferences.value.risk,
-          investmentHorizon: preferences.value.term,
+          investmentHorizonType: 'preset',
+          investmentHorizonPreset: preferences.value.term,
+          investmentHorizonDisplay: preferences.value.term,
           preferredIndustry: preferences.value.industries.join(',')
         })
         alert('偏好设置保存成功')
@@ -392,10 +397,10 @@ export default {
     // 加载用户偏好
     const loadPreferences = async () => {
       try {
-        const res = await getPreference()
+        const res = await getPreference(authStore.userId)
         if (res.data) {
           preferences.value.risk = res.data.riskToleranceLevel || null
-          preferences.value.term = res.data.investmentHorizon || ''
+          preferences.value.term = res.data.investmentHorizonPreset || ''
           preferences.value.industries = res.data.preferredIndustry ? res.data.preferredIndustry.split(',') : []
         }
       } catch (e) {

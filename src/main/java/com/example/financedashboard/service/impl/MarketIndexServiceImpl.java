@@ -37,6 +37,10 @@ public class MarketIndexServiceImpl implements MarketIndexService {
 
     private final ObjectMapper objectMapper = new ObjectMapper();
 
+    private volatile Map<String, Object> cachedOverview = null;
+    private volatile long lastSyncTime = 0;
+    private static final long CACHE_DURATION = 5 * 60 * 1000; // 5分钟缓存
+
     @Override
     public List<SinaRealtimeDTO> getMainIndices() {
         try {
@@ -91,10 +95,22 @@ public class MarketIndexServiceImpl implements MarketIndexService {
 
     @Override
     public Map<String, Object> getMarketOverview() {
+        long currentTime = System.currentTimeMillis();
+
+        if (cachedOverview != null && (currentTime - lastSyncTime) < CACHE_DURATION) {
+            log.info("返回缓存的市场概况数据");
+            return cachedOverview;
+        }
+
         Map<String, Object> overview = new HashMap<>();
 
         try {
             List<StockInfo> allStocks = stockInfoMapper.findAll();
+
+            if (allStocks.isEmpty()) {
+                log.warn("数据库无股票数据，尝试从新浪API获取实时数据");
+                return fetchRealtimeMarketOverview();
+            }
 
             int upCount = 0;
             int downCount = 0;
@@ -145,6 +161,9 @@ public class MarketIndexServiceImpl implements MarketIndexService {
             overview.put("turnoverRate", "--");
             overview.put("updateTime", new Date());
 
+            cachedOverview = overview;
+            lastSyncTime = currentTime;
+
         } catch (Exception e) {
             log.error("获取市场概况失败", e);
             overview.put("upCount", "--");
@@ -157,6 +176,58 @@ public class MarketIndexServiceImpl implements MarketIndexService {
         }
 
         return overview;
+    }
+
+    private Map<String, Object> fetchRealtimeMarketOverview() {
+        Map<String, Object> overview = new HashMap<>();
+        try {
+            List<String> sampleCodes = Arrays.asList(
+                "sh600519", "sh600036", "sh601318", "sh600276", "sh601166",
+                "sz000858", "sz002594", "sz000333", "sz002475", "sz300750"
+            );
+
+            List<SinaRealtimeDTO> realtimeData = sinaDataSyncService.fetchAndCleanBatchRealtimeData(sampleCodes);
+
+            int upCount = 0;
+            int downCount = 0;
+            BigDecimal totalAmount = BigDecimal.ZERO;
+
+            for (SinaRealtimeDTO stock : realtimeData) {
+                if (stock.getChangePercent() != null) {
+                    if (stock.getChangePercent().compareTo(BigDecimal.ZERO) > 0) {
+                        upCount++;
+                    } else if (stock.getChangePercent().compareTo(BigDecimal.ZERO) < 0) {
+                        downCount++;
+                    }
+                }
+                if (stock.getAmount() != null) {
+                    totalAmount = totalAmount.add(stock.getAmount());
+                }
+            }
+
+            int ratio = realtimeData.isEmpty() ? 1 : 500;
+            overview.put("upCount", upCount * ratio);
+            overview.put("downCount", downCount * ratio);
+            overview.put("limitUpCount", 0);
+            overview.put("limitDownCount", 0);
+            overview.put("totalVolume", formatVolume(totalAmount.multiply(BigDecimal.valueOf(ratio))));
+            overview.put("turnoverRate", "--");
+            overview.put("updateTime", new Date());
+
+            log.info("使用实时API数据估算市场概况");
+            return overview;
+
+        } catch (Exception e) {
+            log.error("获取实时市场概况失败", e);
+            overview.put("upCount", "--");
+            overview.put("downCount", "--");
+            overview.put("limitUpCount", "--");
+            overview.put("limitDownCount", "--");
+            overview.put("totalVolume", "--");
+            overview.put("turnoverRate", "--");
+            overview.put("updateTime", new Date());
+            return overview;
+        }
     }
 
     private String formatVolume(BigDecimal volume) {
