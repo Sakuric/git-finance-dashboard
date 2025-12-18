@@ -226,6 +226,12 @@ export default {
 
     const currentIndex = ref(indices[0])
 
+    const toFullCode = (code) => {
+      if (code.startsWith('sh') || code.startsWith('sz')) return code
+      if (code.startsWith('399') || code.startsWith('159')) return 'sz' + code
+      return 'sh' + code
+    }
+
     const topIndices = ref([
       { code: '000001', name: '上证指数', price: '--', change: 0, changePercent: '0.00' },
       { code: '399001', name: '深证成指', price: '--', change: 0, changePercent: '0.00' },
@@ -255,6 +261,15 @@ export default {
             change: Number(item.change || 0).toFixed(2),
             changePercent: Number(item.changePercent || 0).toFixed(2)
           }))
+
+          const current = res.data.find(item => item.stockCode === selectedIndex.value)
+          if (current) {
+            currentPriceData.value = {
+              price: Number(current.currentPrice || 0).toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ','),
+              change: Number(current.change || 0).toFixed(2),
+              changePercent: Number(current.changePercent || 0).toFixed(2)
+            }
+          }
         }
       } catch (err) {
         console.warn('获取大盘指数失败', err)
@@ -520,7 +535,7 @@ export default {
     }
 
     // 初始化分时图
-    const initTimelineChart = () => {
+    const initTimelineChart = async () => {
       const chartDom = document.getElementById('mainKLineChart')
       if (!chartDom) return
 
@@ -530,7 +545,8 @@ export default {
 
       chartInstance.value = echarts.init(chartDom)
 
-      const { data, yesterdayClose } = generateTimelineData(selectedIndex.value)
+      const fallback = generateTimelineData(selectedIndex.value)
+      const { data, yesterdayClose } = fallback
       const times = data.map(item => item.time)
       const prices = data.map(item => parseFloat(item.price))
       const volumes = data.map(item => item.volume)
@@ -748,11 +764,10 @@ export default {
     }
 
     // 初始化K线图
-    const initKLineChart = () => {
+    const initKLineChart = async () => {
       const chartDom = document.getElementById('mainKLineChart')
       if (!chartDom) return
 
-      // 销毁可能存在的旧图表实例
       if (chartInstance.value) {
         chartInstance.value.dispose()
       }
@@ -762,7 +777,26 @@ export default {
       const dataCount = selectedPeriod.value === 'yearly' ? 20 :
                       selectedPeriod.value === 'weekly' ? 104 :
                       selectedPeriod.value === 'monthly' ? 48 : 200
-      const rawData = generateKLineData(dataCount, selectedPeriod.value)
+
+      let rawData
+      try {
+        const res = await getIndexKLine(toFullCode(selectedIndex.value), dataCount)
+        if (res?.code === 200 && res.data?.length > 0) {
+          rawData = res.data.map(item => ({
+            time: item.tradeDate,
+            k: [
+              Number(item.openPrice || 0).toFixed(2),
+              Number(item.closePrice || 0).toFixed(2),
+              Number(item.lowPrice || 0).toFixed(2),
+              Number(item.highPrice || 0).toFixed(2)
+            ]
+          }))
+        } else {
+          rawData = generateKLineData(dataCount, selectedPeriod.value)
+        }
+      } catch {
+        rawData = generateKLineData(dataCount, selectedPeriod.value)
+      }
       const dates = rawData.map(item => item.time)
       const kData = rawData.map(item => item.k)
       
@@ -1012,11 +1046,11 @@ export default {
     // 切换时间周期
     const changePeriod = (period) => {
       selectedPeriod.value = period
-      nextTick(() => {
+      nextTick(async () => {
         if (period === 'timeline') {
-          initTimelineChart()
+          await initTimelineChart()
         } else {
-          initKLineChart()
+          await initKLineChart()
         }
       })
     }
@@ -1026,11 +1060,11 @@ export default {
       const index = indices.find(i => i.code === selectedIndex.value)
       if (index) {
         currentIndex.value = index
-        nextTick(() => {
+        nextTick(async () => {
           if (selectedPeriod.value === 'timeline') {
-            initTimelineChart()
+            await initTimelineChart()
           } else {
-            initKLineChart()
+            await initKLineChart()
           }
         })
       }
@@ -1042,11 +1076,11 @@ export default {
       const index = indices.find(i => i.code === code)
       if (index) {
         currentIndex.value = index
-        nextTick(() => {
+        nextTick(async () => {
           if (selectedPeriod.value === 'timeline') {
-            initTimelineChart()
+            await initTimelineChart()
           } else {
-            initKLineChart()
+            await initKLineChart()
           }
         })
       }

@@ -5,8 +5,10 @@ import com.example.financedashboard.dto.sina.SinaRealtimeDTO;
 import com.example.financedashboard.entity.StockInfo;
 import com.example.financedashboard.mapper.StockInfoMapper;
 import com.example.financedashboard.service.MarketIndexService;
-import com.example.financedashboard.service.realtime.StockDataRealtimeService;
+import com.example.financedashboard.service.eastmoney.EastMoneyApiService;
 import com.example.financedashboard.service.sina.SinaDataSyncService;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -23,10 +25,12 @@ public class MarketIndexServiceImpl implements MarketIndexService {
     private SinaDataSyncService sinaDataSyncService;
 
     @Autowired
-    private StockDataRealtimeService stockDataRealtimeService;
+    private StockInfoMapper stockInfoMapper;
 
     @Autowired
-    private StockInfoMapper stockInfoMapper;
+    private EastMoneyApiService eastMoneyApiService;
+
+    private final ObjectMapper objectMapper = new ObjectMapper();
 
     @Override
     public List<SinaRealtimeDTO> getMainIndices() {
@@ -52,9 +56,30 @@ public class MarketIndexServiceImpl implements MarketIndexService {
     @Override
     public List<KLineDTO> getIndexKLine(String indexCode, Integer days) {
         try {
-            return stockDataRealtimeService.getStockHistory(indexCode, days);
+            String json = eastMoneyApiService.fetchIndexKLine(indexCode, days);
+            if (json == null) return Collections.emptyList();
+
+            JsonNode root = objectMapper.readTree(json);
+            JsonNode klines = root.path("data").path("klines");
+            if (!klines.isArray()) return Collections.emptyList();
+
+            List<KLineDTO> result = new ArrayList<>();
+            for (JsonNode kline : klines) {
+                String[] parts = kline.asText().split(",");
+                if (parts.length < 6) continue;
+
+                KLineDTO dto = new KLineDTO();
+                dto.setTradeDate(java.time.LocalDate.parse(parts[0]));
+                dto.setOpenPrice(new BigDecimal(parts[1]));
+                dto.setClosePrice(new BigDecimal(parts[2]));
+                dto.setHighPrice(new BigDecimal(parts[3]));
+                dto.setLowPrice(new BigDecimal(parts[4]));
+                dto.setVolume(Long.parseLong(parts[5]));
+                result.add(dto);
+            }
+            return result;
         } catch (Exception e) {
-            log.error("获取指数K线数据失败: {}", indexCode, e);
+            log.error("解析东方财富K线失败: {}", indexCode, e);
             return Collections.emptyList();
         }
     }
@@ -89,6 +114,8 @@ public class MarketIndexServiceImpl implements MarketIndexService {
                     }
                 }
             }
+
+            overview.put("totalCount", allStocks.size());
 
             overview.put("upCount", upCount);
             overview.put("downCount", downCount);
