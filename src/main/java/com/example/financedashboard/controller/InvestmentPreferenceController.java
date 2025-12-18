@@ -1,13 +1,15 @@
 package com.example.financedashboard.controller;
 
 import com.example.financedashboard.entity.InvestmentPreference;
+import com.example.financedashboard.mapper.UserMapper;
 import com.example.financedashboard.service.InvestmentPreferenceService;
+import com.example.financedashboard.utils.Result;
 import lombok.Data;
 import lombok.RequiredArgsConstructor;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.web.bind.annotation.*;
 
 import java.math.BigDecimal;
-import java.util.Map;
 
 @RestController
 @RequestMapping("/api/investment-preference")
@@ -15,6 +17,7 @@ import java.util.Map;
 public class InvestmentPreferenceController {
 
     private final InvestmentPreferenceService preferenceService;
+    private final UserMapper userMapper;
 
     @GetMapping("/user/{userId}")
     public InvestmentPreference getPreference(@PathVariable Long userId) {
@@ -22,7 +25,15 @@ public class InvestmentPreferenceController {
     }
 
     @PostMapping
-    public Map<String, Object> savePreference(@RequestBody PreferenceRequest request) {
+    public Result<String> savePreference(@RequestBody PreferenceRequest request) {
+        if (request.getUserId() == null) {
+            return Result.error(400, "用户未登录或会话已失效，请重新登录");
+        }
+
+        if (userMapper.findById(request.getUserId()) == null) {
+            return Result.error(404, "用户不存在，请重新登录后重试");
+        }
+
         InvestmentPreference preference = new InvestmentPreference();
         preference.setUserId(request.getUserId());
         preference.setRiskToleranceLevel(request.getRiskToleranceLevel());
@@ -38,8 +49,14 @@ public class InvestmentPreferenceController {
         preference.setMinExpectedReturn(request.getMinExpectedReturn());
         preference.setMaxAcceptableLoss(request.getMaxAcceptableLoss());
 
-        preferenceService.saveOrUpdate(preference);
-        return Map.of("message", "保存成功");
+        try {
+            preferenceService.saveOrUpdate(preference);
+            return Result.success("保存成功");
+        } catch (DataIntegrityViolationException ex) {
+            return Result.error(400, "用户不存在或未登录，请重新登录后再试");
+        } catch (Exception ex) {
+            return Result.error(500, "保存失败：" + ex.getMessage());
+        }
     }
 
     @DeleteMapping("/user/{userId}")
