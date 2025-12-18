@@ -281,12 +281,12 @@ export default {
         const res = await getMarketOverview()
         if (res?.code === 200 && res.data) {
           marketOverview.value = {
-            upCount: res.data.upCount || '--',
-            downCount: res.data.downCount || '--',
-            limitUpCount: res.data.limitUpCount || '--',
-            limitDownCount: res.data.limitDownCount || '--',
-            totalVolume: res.data.totalVolume || '--',
-            turnoverRate: res.data.turnoverRate || '--',
+            upCount: res.data.upCount ?? '--',
+            downCount: res.data.downCount ?? '--',
+            limitUpCount: res.data.limitUpCount ?? '--',
+            limitDownCount: res.data.limitDownCount ?? '--',
+            totalVolume: res.data.totalVolume ?? '--',
+            turnoverRate: res.data.turnoverRate ?? '--',
             updateTime: res.data.updateTime ? new Date(res.data.updateTime).toLocaleTimeString() : new Date().toLocaleTimeString()
           }
         }

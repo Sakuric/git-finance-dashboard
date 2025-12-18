@@ -2,7 +2,9 @@ package com.example.financedashboard.service.impl;
 
 import com.example.financedashboard.dto.KLineDTO;
 import com.example.financedashboard.dto.sina.SinaRealtimeDTO;
+import com.example.financedashboard.entity.StockHistory;
 import com.example.financedashboard.entity.StockInfo;
+import com.example.financedashboard.mapper.StockHistoryMapper;
 import com.example.financedashboard.mapper.StockInfoMapper;
 import com.example.financedashboard.service.MarketIndexService;
 import com.example.financedashboard.service.eastmoney.EastMoneyApiService;
@@ -29,6 +31,9 @@ public class MarketIndexServiceImpl implements MarketIndexService {
 
     @Autowired
     private EastMoneyApiService eastMoneyApiService;
+
+    @Autowired
+    private StockHistoryMapper stockHistoryMapper;
 
     private final ObjectMapper objectMapper = new ObjectMapper();
 
@@ -95,7 +100,7 @@ public class MarketIndexServiceImpl implements MarketIndexService {
             int downCount = 0;
             int limitUpCount = 0;
             int limitDownCount = 0;
-            BigDecimal totalVolume = BigDecimal.ZERO;
+            BigDecimal totalAmount = BigDecimal.ZERO;
 
             for (StockInfo stock : allStocks) {
                 if (stock.getChangePercent() != null) {
@@ -115,13 +120,28 @@ public class MarketIndexServiceImpl implements MarketIndexService {
                 }
             }
 
-            overview.put("totalCount", allStocks.size());
+            java.time.LocalDate today = java.time.LocalDate.now();
+            List<StockHistory> todayHistory = stockHistoryMapper.findByTradeDate(today);
 
+            if (todayHistory.isEmpty()) {
+                for (int i = 1; i <= 7; i++) {
+                    todayHistory = stockHistoryMapper.findByTradeDate(today.minusDays(i));
+                    if (!todayHistory.isEmpty()) break;
+                }
+            }
+
+            for (StockHistory history : todayHistory) {
+                if (history.getAmount() != null) {
+                    totalAmount = totalAmount.add(history.getAmount());
+                }
+            }
+
+            overview.put("totalCount", allStocks.size());
             overview.put("upCount", upCount);
             overview.put("downCount", downCount);
             overview.put("limitUpCount", limitUpCount);
             overview.put("limitDownCount", limitDownCount);
-            overview.put("totalVolume", formatVolume(totalVolume));
+            overview.put("totalVolume", formatVolume(totalAmount));
             overview.put("turnoverRate", "--");
             overview.put("updateTime", new Date());
 

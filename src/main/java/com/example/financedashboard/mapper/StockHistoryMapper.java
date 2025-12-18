@@ -59,4 +59,9 @@ public interface StockHistoryMapper {
             @Param("stockCode") String stockCode,
             @Param("startDate") LocalDate startDate,
             @Param("endDate") LocalDate endDate);
+
+    /**
+     * 查询指定日期的所有股票历史数据
+     */
+    List<StockHistory> findByTradeDate(@Param("tradeDate") LocalDate tradeDate);
 }

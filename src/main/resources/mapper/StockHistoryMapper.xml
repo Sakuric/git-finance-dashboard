@@ -150,4 +150,10 @@
         ORDER BY trade_date ASC
     </select>
 
+    <!-- 查询指定日期的所有股票历史数据 -->
+    <select id="findByTradeDate" resultMap="BaseResultMap">
+        SELECT * FROM stock_history
+        WHERE trade_date = #{tradeDate}
+    </select>
+
 </mapper>
