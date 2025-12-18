@@ -33,17 +33,23 @@
             <i class="fas fa-user"></i>
             <input
               type="text"
+              id="login-username"
+              name="username"
+              autocomplete="username"
               v-model="loginForm.username"
               placeholder="用户名/邮箱"
               @blur="validateLoginField('username')"
             >
             <span class="error-msg" v-if="loginErrors.username">{{ loginErrors.username }}</span>
           </div>
-          
+
           <div class="input-field" :class="{ error: loginErrors.password }">
             <i class="fas fa-lock"></i>
             <input
               :type="showPassword ? 'text' : 'password'"
+              id="login-password"
+              name="password"
+              autocomplete="current-password"
               v-model="loginForm.password"
               placeholder="密码"
               @blur="validateLoginField('password')"
@@ -215,8 +221,7 @@ export default {
         })
         //存储
         if (res.code === 200 && res.data) {
-          authStore.setToken(res.data)
-          authStore.login(loginForm.username)
+          authStore.login(loginForm.username, res.data)
           showToast('登录成功！')
           setTimeout(() => router.push('/dashboard'), 1000)
         } else {

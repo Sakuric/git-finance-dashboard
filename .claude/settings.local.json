@@ -5,7 +5,14 @@
       "Bash(npm install:*)",
       "Bash(curl:*)",
       "Bash(npm run dev:*)",
-      "Bash(python3:*)"
+      "Bash(python3:*)",
+      "Bash(netstat:*)",
+      "Bash(findstr:*)",
+      "Bash(jps -l:*)",
+      "Bash(mvn clean compile:*)",
+      "Bash(mvn spring-boot:run:*)",
+      "Bash(taskkill:*)",
+      "Bash(mysql:*)"
     ]
   }
 }

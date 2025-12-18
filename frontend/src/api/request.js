@@ -47,6 +47,8 @@ request.interceptors.response.use(
           localStorage.removeItem('isLoggedIn')
           localStorage.removeItem('userEmail')
           localStorage.removeItem('loginTime')
+          localStorage.removeItem('userId')
+          localStorage.removeItem('username')
           window.location.href = '/login'
           break
         case 403:

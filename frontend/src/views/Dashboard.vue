@@ -7,14 +7,14 @@
         <p>欢迎回来, Admin</p>
       </div>
       <div class="header-right">
-        <div class="search-box" style="position: relative;">
+        <div class="search-box" style="position: relative; z-index: 10000;">
           <input
             type="text"
             v-model="searchKeyword"
             @input="handleSearch"
             placeholder="搜索股票代码/名称...">
           <i class="fas fa-search" @click="handleSearch" style="cursor: pointer;"></i>
-          <div v-if="showSearchDropdown" class="search-dropdown" style="position: absolute; top: 100%; left: 0; right: 0; background: var(--card-bg); border: 1px solid var(--border-color); border-radius: 8px; margin-top: 8px; max-height: 300px; overflow-y: auto; z-index: 1000;">
+          <div v-if="showSearchDropdown" class="search-dropdown" style="position: fixed !important; top: 60px; left: auto; right: 20px; width: 400px; background: var(--card-bg); border: 1px solid var(--border-color); border-radius: 8px; margin-top: 8px; max-height: 300px; overflow-y: auto; z-index: 99999 !important; box-shadow: 0 4px 12px rgba(0,0,0,0.3);">
             <div v-if="searchLoading" style="padding: 12px; text-align: center; color: var(--text-secondary);">
               <i class="fas fa-spinner fa-spin"></i> 搜索中...
             </div>
@@ -1118,7 +1118,7 @@ export default {
     let searchTimeout = null
     const handleSearch = async () => {
       const keyword = searchKeyword.value.trim()
-      if (!keyword || keyword.length < 2) {
+      if (!keyword) {
         searchResults.value = []
         searchError.value = ''
         return

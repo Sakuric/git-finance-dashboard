@@ -9,7 +9,7 @@ export default defineConfig({
   
   // 开发服务器配置
   server: {
-    port: 5173,
+    port: 5175,
     host: '0.0.0.0',
     open: true,
     cors: true,

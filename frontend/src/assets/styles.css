@@ -245,6 +245,8 @@ body {
     border: 1px solid var(--border-color);
     backdrop-filter: blur(10px);
     box-shadow: var(--shadow-sm);
+    position: relative;
+    z-index: 1000;
 }
 
 .header-left h2 {
@@ -271,6 +273,16 @@ body {
 
 .search-box {
     position: relative;
+    z-index: 10001;
+}
+
+.search-dropdown {
+    position: fixed !important;
+    z-index: 99999 !important;
+    background: var(--card-bg);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.3);
 }
 
 .search-box i {

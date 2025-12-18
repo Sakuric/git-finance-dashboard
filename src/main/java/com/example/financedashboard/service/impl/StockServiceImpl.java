@@ -10,6 +10,8 @@ import org.springframework.util.StringUtils;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Locale;
+import java.util.stream.Collectors;
 
 @Service
 public class StockServiceImpl implements StockService {
@@ -100,12 +102,15 @@ public class StockServiceImpl implements StockService {
     public List<StockInfo> queryStocks(StockQueryDTO queryDTO) {
         List<StockInfo> allStocks = stockInfoMapper.findAll();
 
-        // 简单的过滤逻辑
         if (StringUtils.hasText(queryDTO.getKeyword())) {
-            String keyword = queryDTO.getKeyword().toLowerCase();
-            allStocks.removeIf(stock ->
-                    !stock.getStockCode().toLowerCase().contains(keyword) &&
-                            !stock.getStockName().toLowerCase().contains(keyword));
+            final String keyword = queryDTO.getKeyword().trim().toLowerCase(Locale.ROOT);
+            allStocks = allStocks.stream()
+                    .filter(stock -> {
+                        String code = StringUtils.hasText(stock.getStockCode()) ? stock.getStockCode().toLowerCase(Locale.ROOT) : "";
+                        String name = StringUtils.hasText(stock.getStockName()) ? stock.getStockName().toLowerCase(Locale.ROOT) : "";
+                        return code.contains(keyword) || name.contains(keyword);
+                    })
+                    .collect(Collectors.toList());
         }
 
         if (StringUtils.hasText(queryDTO.getIndustry())) {

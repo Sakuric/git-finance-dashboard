@@ -3,7 +3,7 @@
     <header class="header">
       <div class="header-left">
         <h2>个股行情</h2>
-        <p>比亚迪 (002594)</p>
+        <p>{{ stockData.name || '--' }} ({{ stockData.code || stockCode }})</p>
       </div>
     </header>
   
@@ -13,9 +13,9 @@
         <!-- 顶部核心信息区 -->
         <div class="stock-overview-pro">
           <div class="main-price-info">
-            <span class="exchange-tag">深</span>
-            <h1>比亚迪</h1>
-            <span class="stock-code-pro">002594</span>
+            <span class="exchange-tag">{{ stockData.exchange || '--' }}</span>
+            <h1>{{ stockData.name || '--' }}</h1>
+            <span class="stock-code-pro">{{ stockData.code || stockCode }}</span>
             <div class="current-price positive">
               <span class="price">{{ stockData.price }}</span>
               <span class="change">+{{ stockData.change }}</span>
@@ -138,6 +138,9 @@ export default {
     const apiKline = ref([])
 
     const stockData = ref({
+      name: '--',
+      code: stockCode.value,
+      exchange: '--',
       price: '--',
       change: '--',
       changePercent: '--'
@@ -526,6 +529,9 @@ export default {
         if (detailRes?.code === 200 && detailRes.data) {
           const detail = detailRes.data
           stockData.value = {
+            name: detail.stockName || stockData.value.name,
+            code: detail.stockCode || stockCode.value,
+            exchange: detail.exchange || stockData.value.exchange,
             price: (detail.currentPrice || '--').toString(),
             change: (detail.changePercent || detail.change || '--').toString(),
             changePercent: (detail.changePercent || '--').toString()
@@ -583,6 +589,7 @@ export default {
     watch(() => route.query.stock, (newStock) => {
       if (newStock && newStock !== stockCode.value) {
         stockCode.value = newStock
+        stockData.value.code = newStock
         tickData.value = []
         loadStockData()
         startRealtimeSimulation()

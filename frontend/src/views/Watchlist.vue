@@ -6,23 +6,34 @@
         <p>管理您关注的股票</p>
       </div>
       <div class="header-right">
-        <div class="search-box">
+        <div class="search-box" style="position: relative; z-index: 10000;">
           <input
             type="text"
             v-model="searchKeyword"
-            placeholder="输入股票代码添加..."
-            @keyup.enter="handleAddFavorite"
+            @input="handleSearch"
+            placeholder="搜索股票代码/名称..."
           >
           <i class="fas fa-search"></i>
+          <div v-if="showSearchDropdown" class="search-dropdown" style="position: fixed !important; top: 60px; left: auto; right: 20px; width: 400px; background: var(--card-bg); border: 1px solid var(--border-color); border-radius: 8px; margin-top: 8px; max-height: 300px; overflow-y: auto; z-index: 99999 !important; box-shadow: 0 4px 12px rgba(0,0,0,0.3);">
+            <div v-if="searchLoading" style="padding: 12px; text-align: center; color: var(--text-secondary);">
+              <i class="fas fa-spinner fa-spin"></i> 搜索中...
+            </div>
+            <div v-else-if="searchError" style="padding: 12px; color: var(--color-negative);">{{ searchError }}</div>
+            <div v-else-if="searchResults.length === 0" style="padding: 12px; text-align: center; color: var(--text-secondary);">暂无结果</div>
+            <div v-else>
+              <div
+                v-for="item in searchResults"
+                :key="item.stockCode"
+                @click="selectSearchResult(item)"
+                style="padding: 12px; cursor: pointer; border-bottom: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center;"
+                @mouseenter="$event.currentTarget.style.background = 'var(--hover-bg)'"
+                @mouseleave="$event.currentTarget.style.background = 'transparent'">
+                <span style="font-weight: 500;">{{ item.stockName }}</span>
+                <small style="color: var(--text-secondary);">{{ item.stockCode }}</small>
+              </div>
+            </div>
+          </div>
         </div>
-        <button
-          class="auth-btn"
-          style="width: auto; padding: 0.6rem 1.2rem;"
-          @click="handleAddFavorite"
-          :disabled="loading"
-        >
-          <span class="btn-text">添加股票</span>
-        </button>
       </div>
     </header>
 
@@ -103,9 +114,10 @@
 </template>
 
 <script>
-import { ref, onMounted, nextTick } from 'vue'
+import { ref, computed, onMounted, nextTick } from 'vue'
 import * as echarts from 'echarts'
 import { getFavorites, removeFavorite, addFavorite } from '@/api/favorite'
+import { searchStock } from '@/api/stock'
 import { useAuthStore } from '@/stores/auth'
 
 export default {
@@ -118,6 +130,10 @@ export default {
     const watchlistStocks = ref([])
     const loading = ref(false)
     const searchKeyword = ref('')
+    const searchResults = ref([])
+    const searchLoading = ref(false)
+    const searchError = ref('')
+    const showSearchDropdown = computed(() => searchKeyword.value && (searchLoading.value || searchError.value || searchResults.value.length > 0))
 
     // 初始化行业分布图表
     const initSectorChart = () => {
@@ -160,13 +176,17 @@ export default {
                 fontWeight: 'bold'
               }
             },
-            data: [
-              { value: 35, name: '科技', itemStyle: { color: '#00AFFF' } },
-              { value: 25, name: '金融', itemStyle: { color: '#00B894' } },
-              { value: 20, name: '消费', itemStyle: { color: '#F39C12' } },
-              { value: 15, name: '医疗', itemStyle: { color: '#6F42C1' } },
-              { value: 5, name: '能源', itemStyle: { color: '#D73A49' } }
-            ]
+            data: (() => {
+              const industryMap = {}
+              watchlistStocks.value.forEach(stock => {
+                const industry = stock.industry || '其他'
+                industryMap[industry] = (industryMap[industry] || 0) + 1
+              })
+              const colors = ['#00AFFF', '#00B894', '#F39C12', '#6F42C1', '#D73A49', '#E74C3C', '#3498DB']
+              return Object.entries(industryMap).map(([name, value], index) => ({
+                value, name, itemStyle: { color: colors[index % colors.length] }
+              }))
+            })()
           }
         ]
       }
@@ -202,7 +222,7 @@ export default {
         },
         xAxis: {
           type: 'category',
-          data: ['贵州茅台', '宁德时代', '比亚迪', '五粮液', '招商银行'],
+          data: watchlistStocks.value.map(s => s.name),
           axisLine: { lineStyle: { color: '#8B949E' } },
           axisLabel: {
             color: '#8B949E',
@@ -223,13 +243,10 @@ export default {
           {
             name: '涨跌幅',
             type: 'bar',
-            data: [
-              { value: 1.5, itemStyle: { color: '#00B894' } },
-              { value: -2.1, itemStyle: { color: '#D63031' } },
-              { value: 0.88, itemStyle: { color: '#00B894' } },
-              { value: 0.65, itemStyle: { color: '#00B894' } },
-              { value: -0.35, itemStyle: { color: '#D63031' } }
-            ],
+            data: watchlistStocks.value.map(s => ({
+              value: s.changePercent || 0,
+              itemStyle: { color: (s.changePercent || 0) >= 0 ? '#00B894' : '#D63031' }
+            })),
             label: {
               show: true,
               position: 'top',
@@ -245,25 +262,35 @@ export default {
 
     // 加载自选股数据
     const loadFavorites = async () => {
+      const userId = authStore.userId || localStorage.getItem('userId')
+      if (!userId) return
+
       try {
         loading.value = true
-        const response = await getFavorites()
+        const response = await getFavorites(userId)
         console.log('自选股数据响应:', response)
         
         if (response && response.code === 200 && response.data) {
-          watchlistStocks.value = response.data.map(stock => ({
-            id: stock.id,
-            code: stock.stockCode,
-            name: stock.stockName,
-            price: stock.currentPrice || '--',
-            change: parseFloat(stock.changePercent) || 0,
-            changeAmount: stock.changePercent ? `${stock.changePercent >= 0 ? '+' : ''}${stock.changePercent}%` : '--',
-            changePercent: parseFloat(stock.changePercent) || 0,
-            volume: stock.volume || '--',
-            industry: stock.industry || '其他',
-            exchange: stock.exchange || '深交所',
-            remark: stock.remark || ''
-          }))
+          watchlistStocks.value = response.data.map(stock => {
+            const price = parseFloat(stock.currentPrice) || 0
+            const changePercent = parseFloat(stock.changePercent) || 0
+            const changeAmount = price * (changePercent / 100)
+            const industry = stock.stockName?.includes('银行') ? '金融' : (stock.industry || '其他')
+
+            return {
+              id: stock.id,
+              code: stock.stockCode,
+              name: stock.stockName,
+              price: stock.currentPrice || '--',
+              change: changePercent,
+              changeAmount: changeAmount ? `${changeAmount >= 0 ? '+' : ''}${changeAmount.toFixed(2)}` : '--',
+              changePercent: changePercent,
+              volume: stock.volume || '--',
+              industry,
+              exchange: stock.exchange || '深交所',
+              remark: stock.remark || ''
+            }
+          })
 
           nextTick(() => {
             initSectorChart()
@@ -304,13 +331,41 @@ export default {
       }
     }
 
-    // 添加自选股
-    const handleAddFavorite = async () => {
-      if (!searchKeyword.value.trim()) {
-        alert('请输入股票代码')
+    // 搜索股票
+    let searchTimeout = null
+    const handleSearch = async () => {
+      const keyword = searchKeyword.value.trim()
+      if (!keyword) {
+        searchResults.value = []
+        searchError.value = ''
         return
       }
 
+      if (searchTimeout) {
+        clearTimeout(searchTimeout)
+      }
+
+      searchTimeout = setTimeout(async () => {
+        searchLoading.value = true
+        searchError.value = ''
+        try {
+          const res = await searchStock(keyword)
+          if (res?.code === 200) {
+            searchResults.value = res.data || []
+          } else {
+            searchError.value = res?.message || '搜索失败'
+          }
+        } catch (err) {
+          console.error('搜索出错', err)
+          searchError.value = '网络错误，请稍后重试'
+        } finally {
+          searchLoading.value = false
+        }
+      }, 300)
+    }
+
+    // 选择搜索结果
+    const selectSearchResult = async (item) => {
       const userId = authStore.userId || localStorage.getItem('userId')
       if (!userId) {
         alert('请先登录')
@@ -318,19 +373,18 @@ export default {
       }
 
       try {
-        const response = await addFavorite(userId, searchKeyword.value.trim().toUpperCase(), '')
-        
-        console.log('添加响应:', response)
-        
+        const response = await addFavorite(userId, item.stockCode, '')
         if (response && response.code === 200) {
           alert('添加成功')
           searchKeyword.value = ''
+          searchResults.value = []
           await loadFavorites()
         } else {
           alert('添加失败: ' + (response?.message || '未知错误'))
         }
       } catch (error) {
         console.error('添加自选股失败:', error)
+        alert('添加失败')
       }
     }
 
@@ -348,8 +402,13 @@ export default {
       watchlistStocks,
       loading,
       searchKeyword,
+      searchResults,
+      searchLoading,
+      searchError,
+      showSearchDropdown,
+      handleSearch,
+      selectSearchResult,
       handleRemoveFavorite,
-      handleAddFavorite,
       viewStockDetail
     }
   }

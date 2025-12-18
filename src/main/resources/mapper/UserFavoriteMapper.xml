@@ -17,10 +17,23 @@
     </delete>
 
     <select id="findByUserId" resultType="com.example.financedashboard.entity.UserFavorite">
-        SELECT id, user_id, stock_id, sort_order, remark, created_at
-        FROM user_favorite
-        WHERE user_id = #{userId}
-        ORDER BY sort_order ASC
+        SELECT
+            uf.id,
+            uf.user_id,
+            uf.stock_id,
+            uf.sort_order,
+            uf.remark,
+            uf.created_at,
+            si.stock_code AS stockCode,
+            si.stock_name AS stockName,
+            si.exchange,
+            si.current_price AS currentPrice,
+            si.change_percent AS changePercent,
+            0 AS volume
+        FROM user_favorite uf
+        LEFT JOIN stock_info si ON uf.stock_id = si.id
+        WHERE uf.user_id = #{userId}
+        ORDER BY uf.sort_order ASC
     </select>
 
     <select id="findByUserIdAndStockId" resultType="com.example.financedashboard.entity.UserFavorite">
