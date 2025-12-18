@@ -3,6 +3,8 @@ package com.example.financedashboard.mapper;
 import com.example.financedashboard.entity.InvestmentAdvice;
 import org.apache.ibatis.annotations.*;
 
+import java.util.List;
+
 @Mapper
 public interface InvestmentAdviceMapper {
 
@@ -15,4 +17,7 @@ public interface InvestmentAdviceMapper {
 
     @Select("SELECT * FROM investment_advice WHERE user_id = #{userId} ORDER BY created_at DESC LIMIT 1")
     InvestmentAdvice findLatestByUserId(Long userId);
+
+    @Select("SELECT * FROM investment_advice WHERE user_id = #{userId} ORDER BY created_at DESC")
+    List<InvestmentAdvice> findByUserId(Long userId);
 }

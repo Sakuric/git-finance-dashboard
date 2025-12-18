@@ -80,12 +80,23 @@ public class AiModelConfigController {
 
     @PostMapping("/test")
     public Map<String, Object> testApiKey(@RequestBody TestRequest request) {
+        if (request.getApiKey() == null || request.getApiKey().trim().isEmpty()) {
+            return Map.of("code", 200, "success", false, "message", "API密钥不能为空");
+        }
+        if (request.getApiUrl() == null || request.getApiUrl().trim().isEmpty()) {
+            return Map.of("code", 200, "success", false, "message", "API地址不能为空");
+        }
+        if (request.getModelName() == null || request.getModelName().trim().isEmpty()) {
+            return Map.of("code", 200, "success", false, "message", "模型名称不能为空");
+        }
+
         try {
             okhttp3.OkHttpClient client = new okhttp3.OkHttpClient.Builder()
-                    .readTimeout(10, java.util.concurrent.TimeUnit.SECONDS)
+                    .connectTimeout(10, java.util.concurrent.TimeUnit.SECONDS)
+                    .readTimeout(15, java.util.concurrent.TimeUnit.SECONDS)
                     .build();
 
-            String testBody = "{\"model\":\"" + (request.getModelName() != null ? request.getModelName() : "gpt-3.5-turbo") +
+            String testBody = "{\"model\":\"" + request.getModelName() +
                     "\",\"messages\":[{\"role\":\"user\",\"content\":\"test\"}],\"max_tokens\":5}";
 
             okhttp3.RequestBody body = okhttp3.RequestBody.create(
@@ -93,22 +104,43 @@ public class AiModelConfigController {
                     okhttp3.MediaType.parse("application/json")
             );
 
+            String apiUrl = request.getApiUrl().trim();
+            if (!apiUrl.endsWith("/")) apiUrl += "/";
+
             okhttp3.Request httpRequest = new okhttp3.Request.Builder()
-                    .url(request.getApiUrl() + "/chat/completions")
-                    .addHeader("Authorization", "Bearer " + request.getApiKey())
+                    .url(apiUrl + "chat/completions")
+                    .addHeader("Authorization", "Bearer " + request.getApiKey().trim())
                     .addHeader("Content-Type", "application/json")
                     .post(body)
                     .build();
 
             try (okhttp3.Response response = client.newCall(httpRequest).execute()) {
+                String responseBody = response.body() != null ? response.body().string() : "";
+
                 if (response.isSuccessful()) {
-                    return Map.of("success", true, "message", "API密钥验证成功");
+                    return Map.of("code", 200, "success", true, "message", "API密钥验证成功，模型连接正常");
                 } else {
-                    return Map.of("success", false, "message", "API密钥验证失败: " + response.code());
+                    String errorMsg = "验证失败";
+                    if (response.code() == 401) {
+                        errorMsg = "API密钥无效或已过期";
+                    } else if (response.code() == 404) {
+                        errorMsg = "模型不存在或API地址错误";
+                    } else if (response.code() == 429) {
+                        errorMsg = "请求过于频繁，请稍后再试";
+                    } else if (responseBody.contains("model") && responseBody.contains("does not exist")) {
+                        errorMsg = "模型 '" + request.getModelName() + "' 不存在";
+                    } else {
+                        errorMsg = "HTTP " + response.code() + ": " + responseBody.substring(0, Math.min(150, responseBody.length()));
+                    }
+                    return Map.of("code", 200, "success", false, "message", errorMsg);
                 }
             }
+        } catch (java.net.UnknownHostException e) {
+            return Map.of("code", 200, "success", false, "message", "无法连接到服务器，请检查API地址");
+        } catch (java.net.SocketTimeoutException e) {
+            return Map.of("code", 200, "success", false, "message", "连接超时，请检查网络");
         } catch (Exception e) {
-            return Map.of("success", false, "message", "连接失败: " + e.getMessage());
+            return Map.of("code", 200, "success", false, "message", "连接失败: " + e.getMessage());
         }
     }
 

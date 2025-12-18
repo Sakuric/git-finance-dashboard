@@ -28,4 +28,13 @@ public class InvestmentAdviceController {
         InvestmentAdvice advice = adviceService.getLatestAdvice(userId);
         return advice != null ? Result.success(advice) : Result.error(404, "暂无投资建议");
     }
+    @GetMapping("/list")
+    public Result<?> getAdviceList(@RequestParam Long userId) {
+        try {
+            return Result.success(adviceService.getUserAdviceList(userId));
+        } catch (Exception e) {
+            return Result.error(500, e.getMessage());
+        }
+    }
+
 }

@@ -162,8 +162,8 @@
                   </span>
                 </div>
                 <div class="model-actions">
-                  <button class="icon-btn" @click.stop="configureModel(model)" title="配置">
-                    <i class="fas fa-cog"></i>
+                  <button class="icon-btn" @click.stop="setDefaultModel(model)" :title="model.dbData.isDefault ? '已是默认模型' : '设为默认模型'">
+                    <i :class="model.dbData.isDefault ? 'fas fa-star' : 'far fa-star'"></i>
                   </button>
                   <button class="icon-btn danger" @click.stop="removeModel(model)" title="删除">
                     <i class="fas fa-trash"></i>
@@ -224,7 +224,8 @@
 
 <script>
 import { ref, reactive, computed, onMounted } from 'vue'
-import { getAiPlatforms, saveAiPlatform, updateAiPlatform, deleteAiPlatform, testApiKey as testApiKeyApi } from '@/api/aiPlatform'
+import { getAiPlatforms, saveAiPlatform, updateAiPlatform, deleteAiPlatform } from '@/api/aiPlatform'
+import { getAiModels, addAiModel, updateAiModel, deleteAiModel, testApiKey as testApiKeyRequest } from '@/api/aiModel'
 
 export default {
   name: 'AiModels',
@@ -285,8 +286,43 @@ export default {
       }
     }
 
+    const loadModels = async () => {
+      try {
+        const userId = localStorage.getItem('userId') || 1
+        const res = await getAiModels(userId)
+        if (res && res.data) {
+          const groupMap = {}
+          res.data.forEach(model => {
+            const groupName = model.modelProvider || 'other'
+            if (!groupMap[groupName]) {
+              groupMap[groupName] = { name: groupName, models: [] }
+            }
+            groupMap[groupName].models.push({
+              id: model.id,
+              name: model.modelName,
+              badges: parseBadges(model.modelType),
+              dbData: model
+            })
+          })
+          modelGroups.value = Object.values(groupMap)
+        }
+      } catch (e) {
+        console.error('加载模型失败', e)
+      }
+    }
+
+    const parseBadges = (modelType) => {
+      const badges = []
+      if (modelType && modelType.includes('vision')) badges.push({ type: 'vision', label: '视觉' })
+      if (modelType && modelType.includes('web')) badges.push({ type: 'web', label: '联网' })
+      if (modelType && modelType.includes('reasoning')) badges.push({ type: 'reasoning', label: '推理' })
+      if (modelType && modelType.includes('tools')) badges.push({ type: 'tools', label: '工具' })
+      return badges
+    }
+
     onMounted(() => {
       loadPlatforms()
+      loadModels()
     })
 
     const selectPlatform = (id) => {
@@ -350,24 +386,26 @@ export default {
     const saveCustomPlatform = async () => {
       if (!validateCustomPlatform()) return
       try {
+        const userId = localStorage.getItem('userId') || 1
         const platformKey = 'custom_' + Date.now()
-        const res = await saveAiPlatform({
-          platformKey: platformKey,
-          platformName: customPlatformName.value,
-          icon: 'fas fa-cog',
-          apiUrl: apiUrl.value,
+        const res = await addAiModel({
+          userId: userId,
+          modelName: customPlatformName.value + '-default',
+          modelProvider: customPlatformName.value,
           apiKey: apiKey.value,
-          isEnabled: 1
+          apiEndpoint: apiUrl.value,
+          modelType: 'chat',
+          isDefault: 0,
+          maxTokens: 4096,
+          temperature: 0.7
         })
-        if (res.code !== 200) {
+        if (res.code && res.code !== 200) {
           alert('保存失败: ' + (res.message || '未知错误'))
           return
         }
-        await loadPlatforms()
-        // 切换到新保存的平台
-        selectPlatform(platformKey)
+        await loadModels()
         customPlatformName.value = ''
-        alert('保存成功！平台已添加到模型平台列表')
+        alert('保存成功！平台配置已保存')
       } catch (e) {
         console.error('保存平台失败:', e)
         alert('保存失败: ' + (e.response?.data?.message || e.message || '网络错误'))
@@ -375,26 +413,27 @@ export default {
     }
 
     const savePlatformConfig = async () => {
-      const platform = platforms.value.find(p => p.id === selectedPlatform.value)
-      if (!platform || !platform.isCustom) {
-        alert('只能保存自定义平台的配置')
+      if (!validatePlatformConfig()) return
+      if (!selectedModel.value) {
+        alert('请先选择一个模型，然后保存配置')
         return
       }
-      if (!validatePlatformConfig()) return
       try {
-        await updateAiPlatform({
-          id: platform.dbId,
-          platformKey: platform.id,
-          platformName: platform.name,
-          icon: platform.icon,
-          apiUrl: apiUrl.value,
+        await updateAiModel(selectedModel.value.id, {
+          userId: selectedModel.value.dbData.userId,
+          modelName: selectedModel.value.name,
+          modelProvider: selectedModel.value.dbData.modelProvider,
           apiKey: apiKey.value,
-          isEnabled: 1
+          apiEndpoint: apiUrl.value,
+          modelType: selectedModel.value.dbData.modelType,
+          isDefault: selectedModel.value.dbData.isDefault,
+          maxTokens: selectedModel.value.dbData.maxTokens,
+          temperature: selectedModel.value.dbData.temperature
         })
-        await loadPlatforms()
+        await loadModels()
         alert('保存成功')
       } catch (e) {
-        alert('保存失败: ' + e.message)
+        alert('保存失败: ' + (e.response?.data?.message || e.message))
       }
     }
 
@@ -429,41 +468,7 @@ export default {
       badges: []
     })
 
-    const modelGroups = ref([
-      {
-        name: 'gemini-2.0',
-        models: [
-          { 
-            id: 1, 
-            name: 'gemini-2.0-flash-exp',
-            badges: [{ type: 'vision', label: '视觉' }]
-          }
-        ]
-      },
-      {
-        name: 'gemini-2.5',
-        models: [
-          { 
-            id: 2, 
-            name: 'gemini-2.5-flash-preview',
-            badges: [
-              { type: 'vision', label: '视觉' },
-              { type: 'web', label: '联网' },
-              { type: 'reasoning', label: '推理' },
-              { type: 'tools', label: '工具' }
-            ]
-          },
-          { 
-            id: 3, 
-            name: 'gemini-2.5-pro',
-            badges: [
-              { type: 'vision', label: '视觉' },
-              { type: 'reasoning', label: '推理' }
-            ]
-          }
-        ]
-      }
-    ])
+    const modelGroups = ref([])
 
     const totalModelsCount = computed(() => {
       return modelGroups.value.reduce((sum, g) => sum + g.models.length, 0)
@@ -497,19 +502,24 @@ export default {
         alert('请先输入API地址')
         return
       }
+      if (!selectedModel.value) {
+        alert('请先选择一个模型进行检测')
+        return
+      }
       try {
-        const res = await testApiKeyApi({
+        const res = await testApiKeyRequest({
           apiKey: apiKey.value,
           apiUrl: apiUrl.value,
-          modelName: selectedModel.value?.name || 'gpt-3.5-turbo'
+          modelName: selectedModel.value.name
         })
         if (res.success) {
-          alert('✅ ' + res.message)
+          alert('✅ ' + res.message + '\n检测模型: ' + selectedModel.value.name)
         } else {
-          alert('❌ ' + res.message)
+          alert('❌ ' + res.message + '\n检测模型: ' + selectedModel.value.name)
         }
       } catch (e) {
-        alert('❌ 检测失败: ' + (e.response?.data?.message || e.message || '网络错误'))
+        const errorMsg = e.response?.data?.message || e.message || '网络错误'
+        alert('❌ 检测失败: ' + errorMsg)
       }
     }
 
@@ -525,39 +535,79 @@ export default {
       alert(`配置模型: ${model.name}`)
     }
 
-    const removeModel = (model) => {
-      if (confirm(`确定删除模型 ${model.name}?`)) {
-        modelGroups.value.forEach(group => {
-          group.models = group.models.filter(m => m.id !== model.id)
+    const setDefaultModel = async (model) => {
+      if (model.dbData.isDefault) {
+        alert('该模型已经是默认模型')
+        return
+      }
+      try {
+        await updateAiModel(model.id, {
+          userId: model.dbData.userId,
+          modelName: model.name,
+          modelProvider: model.dbData.modelProvider,
+          apiKey: model.dbData.apiKey,
+          apiEndpoint: model.dbData.apiEndpoint,
+          modelType: model.dbData.modelType,
+          isDefault: 1,
+          maxTokens: model.dbData.maxTokens,
+          temperature: model.dbData.temperature
         })
-        modelGroups.value = modelGroups.value.filter(g => g.models.length > 0)
+        await loadModels()
+        alert('已设置为默认模型')
+      } catch (e) {
+        alert('设置失败: ' + (e.response?.data?.message || e.message))
       }
     }
 
-    const addModel = () => {
+    const removeModel = async (model) => {
+      if (!confirm(`确定删除模型 ${model.name}?`)) return
+
+      try {
+        await deleteAiModel(model.id)
+        await loadModels()
+        if (selectedModel.value && selectedModel.value.id === model.id) {
+          selectedModel.value = null
+        }
+        alert('删除成功')
+      } catch (e) {
+        alert('删除失败: ' + (e.response?.data?.message || e.message))
+      }
+    }
+
+    const addModel = async () => {
       if (!newModel.value.group || !newModel.value.name) {
         alert('请填写完整信息')
         return
       }
-      
-      let group = modelGroups.value.find(g => g.name === newModel.value.group)
-      if (!group) {
-        group = { name: newModel.value.group, models: [] }
-        modelGroups.value.push(group)
+
+      try {
+        const userId = localStorage.getItem('userId') || 1
+        const modelType = newModel.value.badges.map(b => b.type).join(',')
+
+        await addAiModel({
+          userId: userId,
+          modelName: newModel.value.name,
+          modelProvider: newModel.value.group,
+          apiKey: apiKey.value || '',
+          apiEndpoint: apiUrl.value || '',
+          modelType: modelType,
+          isDefault: 0,
+          maxTokens: 4096,
+          temperature: 0.7
+        })
+
+        await loadModels()
+
+        if (!expandedGroups.value.includes(newModel.value.group)) {
+          expandedGroups.value.push(newModel.value.group)
+        }
+
+        newModel.value = { group: '', name: '', badges: [] }
+        showAddModal.value = false
+        alert('添加成功')
+      } catch (e) {
+        alert('添加失败: ' + (e.response?.data?.message || e.message))
       }
-      
-      group.models.push({
-        id: Date.now(),
-        name: newModel.value.name,
-        badges: newModel.value.badges.map(b => ({ type: b.type, label: b.label }))
-      })
-      
-      if (!expandedGroups.value.includes(newModel.value.group)) {
-        expandedGroups.value.push(newModel.value.group)
-      }
-      
-      newModel.value = { group: '', name: '', badges: [] }
-      showAddModal.value = false
     }
 
     return {
@@ -577,6 +627,7 @@ export default {
       toggleGroup,
       testApiKey,
       configureModel,
+      setDefaultModel,
       removeModel,
       addModel,
       platforms,

@@ -262,4 +262,8 @@ public class InvestmentAdviceService {
 
         return 180;
     }
+
+    public List<InvestmentAdvice> getUserAdviceList(Long userId) {
+        return adviceMapper.findByUserId(userId);
+    }
 }

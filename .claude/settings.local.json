@@ -13,7 +13,9 @@
       "Bash(mvn spring-boot:run:*)",
       "Bash(taskkill:*)",
       "Bash(mysql:*)",
-      "Bash(timeout:*)"
+      "Bash(timeout:*)",
+      "Bash(dir:*)",
+      "Bash(tasklist:*)"
     ]
   }
 }

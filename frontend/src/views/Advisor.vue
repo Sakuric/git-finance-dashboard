@@ -83,6 +83,9 @@
       <div class="card advice-card-large" style="grid-column: 1 / -1;">
         <div class="card-header">
           <h3>最新智能投顾建议</h3>
+          <button class="auth-btn" @click="generateAdvice" :disabled="loading" style="margin-left: auto; padding: 0.5rem 1rem;">
+            <span class="btn-text">{{ loading ? '生成中...' : '生成新建议' }}</span>
+          </button>
           <div class="filter-tabs">
             <button 
               v-for="filter in filters" 
@@ -95,8 +98,8 @@
           </div>
         </div>
         <div class="advice-list">
-          <div 
-            v-for="advice in filteredAdvices" 
+          <div
+            v-for="advice in filteredAdvices"
             :key="advice.id"
             class="advice-item"
           >
@@ -104,27 +107,66 @@
               <div class="advice-type" :class="advice.type">{{ advice.typeLabel }}</div>
               <div class="advice-time">{{ advice.time }}</div>
             </div>
-            <div class="advice-content">
-              <div class="advice-stock">
-                <div class="stock-icon">{{ advice.stock.icon }}</div>
-                <div class="stock-info">
-                  <div class="stock-name">{{ advice.stock.name }} ({{ advice.stock.code }})</div>
-                  <div class="stock-price">
-                    {{ advice.stock.price }} 
-                    <span :class="advice.stock.change >= 0 ? 'positive' : 'negative'">{{ advice.stock.changePercent }}%</span>
+
+            <div class="advice-content-structured">
+              <!-- 世界形势分析 -->
+              <div v-if="advice.parsed?.worldSituation" class="analysis-section">
+                <h4 class="section-title">🌍 {{ advice.parsed.worldSituation.title }}</h4>
+                <p class="section-content">{{ advice.parsed.worldSituation.content }}</p>
+              </div>
+
+              <!-- 国家政策解读 -->
+              <div v-if="advice.parsed?.nationalPolicy" class="analysis-section">
+                <h4 class="section-title">🏛️ {{ advice.parsed.nationalPolicy.title }}</h4>
+                <p class="section-content">{{ advice.parsed.nationalPolicy.content }}</p>
+              </div>
+
+              <!-- 行业趋势研判 -->
+              <div v-if="advice.parsed?.industryTrends" class="analysis-section">
+                <h4 class="section-title">📊 {{ advice.parsed.industryTrends.title }}</h4>
+                <p class="section-content">{{ advice.parsed.industryTrends.content }}</p>
+              </div>
+
+              <!-- 个股深度分析 -->
+              <div v-if="advice.parsed?.companyOverview" class="analysis-section">
+                <h4 class="section-title">🏢 {{ advice.parsed.companyOverview.title }}</h4>
+                <p class="section-content">{{ advice.parsed.companyOverview.content }}</p>
+              </div>
+
+              <!-- 投资建议 -->
+              <div v-if="advice.parsed?.recommendations?.length" class="recommendations-section">
+                <h4 class="section-title">💡 投资建议</h4>
+                <div v-for="rec in advice.parsed.recommendations" :key="rec.code" class="recommendation-card">
+                  <div class="rec-header">
+                    <div class="rec-stock">
+                      <span class="rec-name">{{ rec.name }}</span>
+                      <span class="rec-code">{{ rec.code }}</span>
+                    </div>
+                    <div class="rec-action" :class="rec.suggestedAction.toLowerCase()">
+                      {{ rec.suggestedAction === 'BUY' ? '买入' : rec.suggestedAction === 'SELL' ? '卖出' : '持有' }}
+                    </div>
+                  </div>
+                  <div class="rec-thesis">{{ rec.thesis }}</div>
+                  <div class="rec-prices">
+                    <div class="price-item">
+                      <span class="price-label">建议买入区间</span>
+                      <span class="price-value">¥{{ rec.entryPriceStart }} - ¥{{ rec.entryPriceEnd }}</span>
+                    </div>
+                    <div class="price-item">
+                      <span class="price-label">目标价</span>
+                      <span class="price-value positive">¥{{ rec.takeProfitPrice }}</span>
+                    </div>
+                    <div class="price-item">
+                      <span class="price-label">止损价</span>
+                      <span class="price-value negative">¥{{ rec.stopLossPrice }}</span>
+                    </div>
                   </div>
                 </div>
               </div>
-              <div class="advice-details">
-                <p>{{ advice.content }}</p>
-                <div class="advice-model">
-                  <i class="fas fa-robot"></i> 由 "{{ advice.model }}" 生成
-                </div>
+
+              <div class="advice-model">
+                <i class="fas fa-robot"></i> 由 "{{ advice.model }}" 生成
               </div>
-            </div>
-            <div class="advice-actions">
-              <button class="btn-primary" style="padding: 0.5rem 1rem; font-size: 0.85rem;">查看详情</button>
-              <button class="btn-secondary" style="padding: 0.5rem 1rem; font-size: 0.85rem;">忽略建议</button>
             </div>
           </div>
         </div>
@@ -145,6 +187,7 @@ import { ref, reactive, computed, onMounted, nextTick } from 'vue'
 import { useRouter } from 'vue-router'
 import * as echarts from 'echarts'
 import { savePreference, getPreference } from '@/api/preference'
+import { adviceApi } from '@/api/advice'
 import { useAuthStore } from '@/stores/auth'
 
 export default {
@@ -210,56 +253,55 @@ export default {
       { label: '持仓分析', value: 'analysis' }
     ]
 
-    const advices = ref([
-      {
-        id: 1,
-        type: 'buy',
-        typeLabel: '买入建议',
-        time: '2023-10-27 10:30',
-        stock: {
-          icon: 'BYD',
-          name: '比亚迪',
-          code: '002594',
-          price: '255.88',
-          change: 0.88,
-          changePercent: '+0.88'
-        },
-        content: '根据您的 "稳健增长型" 偏好和最新市场数据，建议关注新能源汽车板块。比亚迪作为行业龙头，近期技术指标显示买入信号，建议在价格回调至252元附近时适度建仓。',
-        model: '我的增长模型 V2'
-      },
-      {
-        id: 2,
-        type: 'sell',
-        typeLabel: '卖出建议',
-        time: '2023-10-27 09:15',
-        stock: {
-          icon: '300750',
-          name: '宁德时代',
-          code: '300750',
-          price: '218.50',
-          change: -2.1,
-          changePercent: '-2.10'
-        },
-        content: '宁德时代近期技术指标显示卖出信号，RSI指标进入超买区域。建议部分减仓，锁定利润，等待更好的入场时机。',
-        model: '技术分析模型 V1'
-      },
-      {
-        id: 3,
-        type: 'analysis',
-        typeLabel: '持仓分析',
-        time: '2023-10-26 16:00',
-        stock: {
-          icon: '600519',
-          name: '贵州茅台',
-          code: '600519',
-          price: '1850.00',
-          change: 1.5,
-          changePercent: '+1.50'
-        },
-        content: '您的贵州茅台持仓表现良好，近期走势强于大盘。根据基本面分析，公司业绩稳定增长，建议继续持有，可考虑在季度报告发布后适当加仓。',
-        model: '持仓分析模型 V3'
+    const advices = ref([])
+    const loading = ref(false)
+
+    // 加载投顾建议列表
+    const loadAdvices = async () => {
+      const uid = ensureUserId()
+      if (!uid) return
+      loading.value = true
+      try {
+        const res = await adviceApi.getUserAdvice(uid)
+        if (res && res.data) {
+          let parsed = null
+          try {
+            const content = res.data.content || res.data.reasoning || '{}'
+            parsed = typeof content === 'string' ? JSON.parse(content) : content
+          } catch (e) {
+            console.error('解析投顾建议JSON失败', e)
+          }
+
+          advices.value = [{
+            id: res.data.id,
+            type: 'analysis',
+            typeLabel: 'AI投资建议',
+            time: res.data.createdAt || new Date().toLocaleString(),
+            parsed: parsed,
+            model: 'AI智能投顾'
+          }]
+        }
+      } catch (e) {
+        console.error('加载投顾建议失败', e)
+      } finally {
+        loading.value = false
       }
-    ])
+    }
+
+    const generateAdvice = async () => {
+      const uid = ensureUserId()
+      if (!uid) return
+      loading.value = true
+      try {
+        await adviceApi.createAdvice(uid)
+        alert('投顾建议生成成功！')
+        await loadAdvices()
+      } catch (e) {
+        alert('生成失败: ' + (e?.response?.data?.message || e.message || '网络错误'))
+      } finally {
+        loading.value = false
+      }
+    }
 
     // 过滤后的建议
     const filteredAdvices = computed(() => {
@@ -427,6 +469,7 @@ export default {
 
     onMounted(() => {
       loadPreferences()
+      loadAdvices()
       nextTick(() => {
         initPortfolioChart()
       })
@@ -437,13 +480,15 @@ export default {
       preferences,
       errors,
       saving,
+      loading,
       riskLevels,
       investmentTerms,
       industryCategories,
       filters,
       activeFilter,
       filteredAdvices,
-      savePreferences
+      savePreferences,
+      generateAdvice
     }
   }
 }
@@ -569,4 +614,150 @@ export default {
 .error-msg { color: #F85149; font-size: 12px; margin-top: 6px; display: block; }
 .has-error .industry-select-group { border-color: #F85149; }
 .auth-btn:disabled { opacity: 0.6; cursor: not-allowed; }
+
+/* 结构化投资建议样式 */
+.advice-content-structured {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.analysis-section {
+  padding: 16px;
+  background: #0D1117;
+  border: 1px solid #30363D;
+  border-radius: 8px;
+}
+
+.section-title {
+  color: #58A6FF;
+  font-size: 16px;
+  font-weight: 600;
+  margin: 0 0 12px 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.section-content {
+  color: #C9D1D9;
+  font-size: 14px;
+  line-height: 1.8;
+  margin: 0;
+  text-align: justify;
+}
+
+.recommendations-section {
+  padding: 16px;
+  background: linear-gradient(135deg, #0D1117 0%, #161B22 100%);
+  border: 1px solid #30363D;
+  border-radius: 8px;
+}
+
+.recommendation-card {
+  background: #161B22;
+  border: 1px solid #30363D;
+  border-radius: 8px;
+  padding: 16px;
+  margin-top: 12px;
+}
+
+.rec-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.rec-stock {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.rec-name {
+  color: #C9D1D9;
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.rec-code {
+  color: #8B949E;
+  font-size: 14px;
+  background: #0D1117;
+  padding: 4px 8px;
+  border-radius: 4px;
+}
+
+.rec-action {
+  padding: 6px 16px;
+  border-radius: 6px;
+  font-weight: 600;
+  font-size: 14px;
+}
+
+.rec-action.buy {
+  background: rgba(46, 160, 67, 0.2);
+  color: #3FB950;
+  border: 1px solid #3FB950;
+}
+
+.rec-action.sell {
+  background: rgba(248, 81, 73, 0.2);
+  color: #F85149;
+  border: 1px solid #F85149;
+}
+
+.rec-action.hold {
+  background: rgba(139, 148, 158, 0.2);
+  color: #8B949E;
+  border: 1px solid #8B949E;
+}
+
+.rec-thesis {
+  color: #C9D1D9;
+  font-size: 14px;
+  line-height: 1.6;
+  margin-bottom: 16px;
+  padding: 12px;
+  background: #0D1117;
+  border-left: 3px solid #58A6FF;
+  border-radius: 4px;
+}
+
+.rec-prices {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 12px;
+}
+
+.price-item {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 12px;
+  background: #0D1117;
+  border: 1px solid #30363D;
+  border-radius: 6px;
+}
+
+.price-label {
+  color: #8B949E;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.price-value {
+  color: #C9D1D9;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.price-value.positive {
+  color: #3FB950;
+}
+
+.price-value.negative {
+  color: #F85149;
+}
 </style>

@@ -27,13 +27,7 @@ request.interceptors.request.use(
 // 响应拦截器
 request.interceptors.response.use(
   response => {
-    const res = response.data
-    // 根据后端返回的数据结构进行调整
-    if (res.code && res.code !== 200) {
-      // 处理业务错误
-      return Promise.reject(new Error(res.message || '请求失败'))
-    }
-    return res
+    return response.data
   },
   async error => {
     console.error('请求错误:', error)

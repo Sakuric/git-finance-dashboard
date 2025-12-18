@@ -1,8 +1,12 @@
 import request from './request'
 
 export const adviceApi = {
-  getAdviceList() {
-    return Promise.reject(new Error('Advice list endpoint not implemented'))
+  getAdviceList(userId) {
+    return request({
+      url: '/advice/list',
+      method: 'get',
+      params: { userId }
+    })
   },
 
   getAdviceDetail(adviceId) {
