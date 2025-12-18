@@ -106,10 +106,12 @@
 import { ref, onMounted, nextTick } from 'vue'
 import * as echarts from 'echarts'
 import { getFavorites, removeFavorite, addFavorite } from '@/api/favorite'
+import { useAuthStore } from '@/stores/auth'
 
 export default {
   name: 'Watchlist',
   setup() {
+    const authStore = useAuthStore()
     const sectorChart = ref(null)
     const performanceChart = ref(null)
 
@@ -257,40 +259,22 @@ export default {
             change: parseFloat(stock.changePercent) || 0,
             changeAmount: stock.changePercent ? `${stock.changePercent >= 0 ? '+' : ''}${stock.changePercent}%` : '--',
             changePercent: parseFloat(stock.changePercent) || 0,
-            volume: Math.floor(Math.random() * 1000000 + 100000).toLocaleString(),
+            volume: stock.volume || '--',
             industry: stock.industry || '其他',
             exchange: stock.exchange || '深交所',
             remark: stock.remark || ''
           }))
-          
+
           nextTick(() => {
             initSectorChart()
             initPerformanceChart()
           })
-        } else {
-          loadMockData()
         }
       } catch (error) {
         console.error('加载自选股失败:', error)
-        loadMockData()
       } finally {
         loading.value = false
       }
-    }
-
-    // 加载模拟数据
-    const loadMockData = () => {
-      watchlistStocks.value = [
-        { id: 1, code: '000001', name: '平安银行', price: 12.85, change: 1.2, changeAmount: '+1.2%', changePercent: 1.2, volume: '523,456' },
-        { id: 2, code: '600519', name: '贵州茅台', price: 1850.00, change: 0.5, changeAmount: '+0.5%', changePercent: 0.5, volume: '125,789' },
-        { id: 3, code: '300750', name: '宁德时代', price: 218.50, change: -2.1, changeAmount: '-2.1%', changePercent: -2.1, volume: '856,234' },
-        { id: 4, code: '000858', name: '五粮液', price: 165.80, change: 1.8, changeAmount: '+1.8%', changePercent: 1.8, volume: '345,678' },
-        { id: 5, code: '002594', name: '比亚迪', price: 255.88, change: 0.88, changeAmount: '+0.88%', changePercent: 0.88, volume: '678,901' }
-      ]
-      nextTick(() => {
-        initSectorChart()
-        initPerformanceChart()
-      })
     }
 
     // 删除自选股
@@ -298,32 +282,22 @@ export default {
       if (!confirm(`确定要删除股票 ${stockCode} 吗？`)) {
         return
       }
-      
+
+      const userId = authStore.userId || localStorage.getItem('userId')
+      if (!userId) {
+        alert('请先登录')
+        return
+      }
+
       try {
-        const response = await removeFavorite(stockCode)
+        const response = await removeFavorite(userId, stockCode)
         console.log('删除响应:', response)
         
         if (response && response.code === 200) {
-          // 使用更友好的提示方式
-          const message = document.createElement('div')
-          message.textContent = '删除成功'
-          message.style.cssText = `
-            position: fixed;
-            top: 20px;
-            right: 20px;
-            background: #00B894;
-            color: white;
-            padding: 10px 20px;
-            border-radius: 6px;
-            z-index: 9999;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.2);
-          `
-          document.body.appendChild(message)
-          setTimeout(() => document.body.removeChild(message), 2000)
-          
+          alert('删除成功')
           await loadFavorites()
         } else {
-          console.warn('删除失败:', response?.message)
+          alert('删除失败: ' + (response?.message || '未知错误'))
         }
       } catch (error) {
         console.error('删除自选股失败:', error)
@@ -333,55 +307,27 @@ export default {
     // 添加自选股
     const handleAddFavorite = async () => {
       if (!searchKeyword.value.trim()) {
-        // 使用更友好的提示方式
-        const message = document.createElement('div')
-        message.textContent = '请输入股票代码'
-        message.style.cssText = `
-          position: fixed;
-          top: 20px;
-          right: 20px;
-          background: #D63031;
-          color: white;
-          padding: 10px 20px;
-          border-radius: 6px;
-          z-index: 9999;
-          box-shadow: 0 2px 10px rgba(0,0,0,0.2);
-        `
-        document.body.appendChild(message)
-        setTimeout(() => document.body.removeChild(message), 2000)
+        alert('请输入股票代码')
         return
       }
-      
+
+      const userId = authStore.userId || localStorage.getItem('userId')
+      if (!userId) {
+        alert('请先登录')
+        return
+      }
+
       try {
-        const response = await addFavorite({
-          stockCode: searchKeyword.value.trim().toUpperCase(),
-          remark: ''
-        })
+        const response = await addFavorite(userId, searchKeyword.value.trim().toUpperCase(), '')
         
         console.log('添加响应:', response)
         
         if (response && response.code === 200) {
-          // 使用更友好的提示方式
-          const message = document.createElement('div')
-          message.textContent = '添加成功'
-          message.style.cssText = `
-            position: fixed;
-            top: 20px;
-            right: 20px;
-            background: #00B894;
-            color: white;
-            padding: 10px 20px;
-            border-radius: 6px;
-            z-index: 9999;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.2);
-          `
-          document.body.appendChild(message)
-          setTimeout(() => document.body.removeChild(message), 2000)
-          
+          alert('添加成功')
           searchKeyword.value = ''
           await loadFavorites()
         } else {
-          console.warn('添加失败:', response?.message)
+          alert('添加失败: ' + (response?.message || '未知错误'))
         }
       } catch (error) {
         console.error('添加自选股失败:', error)

@@ -63,7 +63,25 @@ export function removeFromWatchlist(userId, stockCode) {
 }
 
 export function getMarketIndices() {
-  return Promise.reject(new Error('Market indices endpoint not implemented'))
+  return request({
+    url: '/market/indices',
+    method: 'get'
+  })
+}
+
+export function getMarketOverview() {
+  return request({
+    url: '/market/overview',
+    method: 'get'
+  })
+}
+
+export function getIndexKLine(indexCode, days = 250) {
+  return request({
+    url: `/market/indices/${indexCode}/kline`,
+    method: 'get',
+    params: { days }
+  })
 }
 
 export function searchStock(keyword) {

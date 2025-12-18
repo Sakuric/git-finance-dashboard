@@ -2,6 +2,8 @@ package com.example.financedashboard.service.impl;
 
 import com.example.financedashboard.dto.UserRegisterDTO;
 import com.example.financedashboard.dto.UserLoginDTO;
+import com.example.financedashboard.dto.UserUpdateDTO;
+import com.example.financedashboard.dto.ChangePasswordDTO;
 import com.example.financedashboard.entity.User;
 import com.example.financedashboard.mapper.UserMapper;
 import com.example.financedashboard.service.UserService;
@@ -82,11 +84,47 @@ public class UserServiceImpl implements UserService {
 
     @Override
     public boolean logout(String token) {
-        // 处理Bearer token格式
         if (token != null && token.startsWith("Bearer ")) {
             token = token.substring(7);
         }
-        // 在实际应用中，可以将token加入黑名单
         return true;
+    }
+
+    @Override
+    public boolean updateUserInfo(String token, UserUpdateDTO userUpdateDTO) {
+        if (token != null && token.startsWith("Bearer ")) {
+            token = token.substring(7);
+        }
+        String username = jwtUtil.getUsernameFromToken(token);
+        User user = userMapper.findByUsername(username);
+        if (user == null) {
+            throw new RuntimeException("用户不存在");
+        }
+        if (userUpdateDTO.getEmail() != null) {
+            user.setEmail(userUpdateDTO.getEmail());
+        }
+        if (userUpdateDTO.getUsername() != null) {
+            user.setUsername(userUpdateDTO.getUsername());
+        }
+        user.setUpdatedAt(LocalDateTime.now());
+        return userMapper.update(user) > 0;
+    }
+
+    @Override
+    public boolean changePassword(String token, ChangePasswordDTO changePasswordDTO) {
+        if (token != null && token.startsWith("Bearer ")) {
+            token = token.substring(7);
+        }
+        String username = jwtUtil.getUsernameFromToken(token);
+        User user = userMapper.findByUsername(username);
+        if (user == null) {
+            throw new RuntimeException("用户不存在");
+        }
+        if (!passwordEncoder.matches(changePasswordDTO.getOldPassword(), user.getPassword())) {
+            throw new RuntimeException("原密码错误");
+        }
+        user.setPassword(passwordEncoder.encode(changePasswordDTO.getNewPassword()));
+        user.setUpdatedAt(LocalDateTime.now());
+        return userMapper.update(user) > 0;
     }
 }

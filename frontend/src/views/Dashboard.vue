@@ -7,9 +7,32 @@
         <p>欢迎回来, Admin</p>
       </div>
       <div class="header-right">
-        <div class="search-box">
-          <input type="text" placeholder="搜索股票代码/名称...">
-          <i class="fas fa-search"></i>
+        <div class="search-box" style="position: relative;">
+          <input
+            type="text"
+            v-model="searchKeyword"
+            @input="handleSearch"
+            placeholder="搜索股票代码/名称...">
+          <i class="fas fa-search" @click="handleSearch" style="cursor: pointer;"></i>
+          <div v-if="showSearchDropdown" class="search-dropdown" style="position: absolute; top: 100%; left: 0; right: 0; background: var(--card-bg); border: 1px solid var(--border-color); border-radius: 8px; margin-top: 8px; max-height: 300px; overflow-y: auto; z-index: 1000;">
+            <div v-if="searchLoading" style="padding: 12px; text-align: center; color: var(--text-secondary);">
+              <i class="fas fa-spinner fa-spin"></i> 搜索中...
+            </div>
+            <div v-else-if="searchError" style="padding: 12px; color: var(--color-negative);">{{ searchError }}</div>
+            <div v-else-if="searchResults.length === 0" style="padding: 12px; text-align: center; color: var(--text-secondary);">暂无结果</div>
+            <div v-else>
+              <div
+                v-for="item in searchResults"
+                :key="item.stockCode"
+                @click="selectSearchResult(item)"
+                style="padding: 12px; cursor: pointer; border-bottom: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center;"
+                @mouseenter="$event.currentTarget.style.background = 'var(--hover-bg)'"
+                @mouseleave="$event.currentTarget.style.background = 'transparent'">
+                <span style="font-weight: 500;">{{ item.stockName }}</span>
+                <small style="color: var(--text-secondary);">{{ item.stockCode }}</small>
+              </div>
+            </div>
+          </div>
         </div>
         <div class="user-profile">
           <img src="https://i.pravatar.cc/40?u=admin" alt="User Avatar">
@@ -159,12 +182,17 @@
 </template>
 
 <script>
-import { ref, onMounted, nextTick } from 'vue'
+import { ref, computed, onMounted, nextTick } from 'vue'
+import { useRouter } from 'vue-router'
 import * as echarts from 'echarts'
+import { searchStock, getWatchlist, getMarketIndices, getMarketOverview, getIndexKLine } from '@/api/stock'
+import { useAuthStore } from '@/stores/auth'
 
 export default {
   name: 'Dashboard',
   setup() {
+    const router = useRouter()
+    const authStore = useAuthStore()
     const selectedPeriod = ref('timeline')
     const selectedIndex = ref('000001')
     const chartInstance = ref(null)
@@ -173,6 +201,12 @@ export default {
       change: 12.50,
       changePercent: '+0.40'
     })
+
+    const searchKeyword = ref('')
+    const searchResults = ref([])
+    const searchLoading = ref(false)
+    const searchError = ref('')
+    const showSearchDropdown = computed(() => searchKeyword.value && (searchLoading.value || searchError.value || searchResults.value.length > 0))
 
     const periods = [
       { label: '分时', value: 'timeline' },
@@ -193,62 +227,58 @@ export default {
     const currentIndex = ref(indices[0])
 
     const topIndices = ref([
-      {
-        code: '000001',
-        name: '上证指数',
-        price: '3,145.80',
-        change: 12.50,
-        changePercent: '+0.40'
-      },
-      {
-        code: '399001',
-        name: '深证成指',
-        price: '10,480.11',
-        change: -25.30,
-        changePercent: '-0.24'
-      },
-      {
-        code: '399006',
-        name: '创业板指',
-        price: '1,985.50',
-        change: 15.80,
-        changePercent: '+0.80'
-      }
+      { code: '000001', name: '上证指数', price: '--', change: 0, changePercent: '0.00' },
+      { code: '399001', name: '深证成指', price: '--', change: 0, changePercent: '0.00' },
+      { code: '399006', name: '创业板指', price: '--', change: 0, changePercent: '0.00' }
     ])
 
-    const watchlistStocks = ref([
-      {
-        name: '贵州茅台',
-        code: '600519',
-        price: '1850.00',
-        change: 27.50,
-        changePercent: '+1.50'
-      },
-      {
-        name: '宁德时代',
-        code: '300750',
-        price: '218.50',
-        change: -4.68,
-        changePercent: '-2.10'
-      },
-      {
-        name: '比亚迪',
-        code: '002594',
-        price: '255.88',
-        change: 2.23,
-        changePercent: '+0.88'
-      }
-    ])
+    const watchlistStocks = ref([])
 
     const marketOverview = ref({
-      upCount: '2,458',
-      downCount: '1,832',
-      limitUpCount: '85',
-      limitDownCount: '12',
-      totalVolume: '8,956亿',
-      turnoverRate: '2.35%',
-      updateTime: '15:00:00'
+      upCount: '--',
+      downCount: '--',
+      limitUpCount: '--',
+      limitDownCount: '--',
+      totalVolume: '--',
+      turnoverRate: '--',
+      updateTime: new Date().toLocaleTimeString()
     })
+
+    const loadMarketIndices = async () => {
+      try {
+        const res = await getMarketIndices()
+        if (res?.code === 200 && Array.isArray(res.data)) {
+          topIndices.value = res.data.map(item => ({
+            code: item.stockCode,
+            name: item.stockName,
+            price: Number(item.currentPrice || 0).toFixed(2),
+            change: Number(item.change || 0).toFixed(2),
+            changePercent: Number(item.changePercent || 0).toFixed(2)
+          }))
+        }
+      } catch (err) {
+        console.warn('获取大盘指数失败', err)
+      }
+    }
+
+    const loadMarketOverview = async () => {
+      try {
+        const res = await getMarketOverview()
+        if (res?.code === 200 && res.data) {
+          marketOverview.value = {
+            upCount: res.data.upCount || '--',
+            downCount: res.data.downCount || '--',
+            limitUpCount: res.data.limitUpCount || '--',
+            limitDownCount: res.data.limitDownCount || '--',
+            totalVolume: res.data.totalVolume || '--',
+            turnoverRate: res.data.turnoverRate || '--',
+            updateTime: res.data.updateTime ? new Date(res.data.updateTime).toLocaleTimeString() : new Date().toLocaleTimeString()
+          }
+        }
+      } catch (err) {
+        console.warn('获取市场概况失败', err)
+      }
+    }
 
     // 生成分时数据
     const generateTimelineData = (indexCode = '000001') => {
@@ -996,8 +1026,6 @@ export default {
       const index = indices.find(i => i.code === selectedIndex.value)
       if (index) {
         currentIndex.value = index
-        // 更新顶部指数数据
-        updateTopIndicesData(selectedIndex.value)
         nextTick(() => {
           if (selectedPeriod.value === 'timeline') {
             initTimelineChart()
@@ -1014,7 +1042,6 @@ export default {
       const index = indices.find(i => i.code === code)
       if (index) {
         currentIndex.value = index
-        updateTopIndicesData(code)
         nextTick(() => {
           if (selectedPeriod.value === 'timeline') {
             initTimelineChart()
@@ -1054,10 +1081,71 @@ export default {
       }
     }
 
+    let searchTimeout = null
+    const handleSearch = async () => {
+      const keyword = searchKeyword.value.trim()
+      if (!keyword || keyword.length < 2) {
+        searchResults.value = []
+        searchError.value = ''
+        return
+      }
+
+      if (searchTimeout) {
+        clearTimeout(searchTimeout)
+      }
+
+      searchTimeout = setTimeout(async () => {
+        searchLoading.value = true
+        searchError.value = ''
+        try {
+          const res = await searchStock(keyword)
+          if (res?.code === 200) {
+            searchResults.value = res.data || []
+          } else {
+            searchError.value = res?.message || '搜索失败'
+          }
+        } catch (err) {
+          console.error('搜索出错', err)
+          searchError.value = '网络错误，请稍后重试'
+        } finally {
+          searchLoading.value = false
+        }
+      }, 300)
+    }
+
+    const selectSearchResult = (item) => {
+      searchKeyword.value = ''
+      searchResults.value = []
+      router.push(`/market?stock=${item.stockCode}`)
+    }
+
+    const loadWatchlist = async () => {
+      const userId = authStore.userId || localStorage.getItem('userId')
+      if (!userId) return
+
+      try {
+        const res = await getWatchlist(userId)
+        if (res?.code === 200 && Array.isArray(res.data)) {
+          watchlistStocks.value = res.data.slice(0, 3).map(item => ({
+            name: item.stockName,
+            code: item.stockCode,
+            price: item.currentPrice || '--',
+            change: Number(item.changePercent || 0),
+            changePercent: item.changePercent ? `${item.changePercent >= 0 ? '+' : ''}${item.changePercent}` : '--'
+          }))
+        }
+      } catch (err) {
+        console.warn('获取自选股失败', err)
+      }
+    }
+
     onMounted(() => {
-      nextTick(() => {
-        // 初始化顶部指数数据
-        updateTopIndicesData(selectedIndex.value)
+      nextTick(async () => {
+        await Promise.all([
+          loadWatchlist(),
+          loadMarketIndices(),
+          loadMarketOverview()
+        ])
         initMiniCharts()
         initTimelineChart()
       })
@@ -1076,7 +1164,14 @@ export default {
       changePeriod,
       changeIndex,
       selectTopIndex,
-      updateTopIndicesData
+      updateTopIndicesData,
+      searchKeyword,
+      searchResults,
+      searchLoading,
+      searchError,
+      showSearchDropdown,
+      handleSearch,
+      selectSearchResult
     }
   }
 }

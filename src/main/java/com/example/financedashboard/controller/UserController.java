@@ -2,6 +2,8 @@ package com.example.financedashboard.controller;
 
 import com.example.financedashboard.dto.UserLoginDTO;
 import com.example.financedashboard.dto.UserRegisterDTO;
+import com.example.financedashboard.dto.UserUpdateDTO;
+import com.example.financedashboard.dto.ChangePasswordDTO;
 import com.example.financedashboard.service.UserService;
 import com.example.financedashboard.utils.Result;
 import com.example.financedashboard.vo.UserVO;
@@ -42,11 +44,30 @@ public class UserController {
     @PostMapping("/logout")
     public Result<Boolean> logout(HttpServletRequest request) {
         String token = request.getHeader("Authorization");
-        // 处理Bearer token格式
         if (token != null && token.startsWith("Bearer ")) {
             token = token.substring(7);
         }
         boolean success = userService.logout(token);
         return success ? Result.success(true) : Result.error(500, "用户登出失败");
+    }
+
+    @PutMapping("/update")
+    public Result<Boolean> updateUserInfo(HttpServletRequest request, @RequestBody UserUpdateDTO userUpdateDTO) {
+        String token = request.getHeader("Authorization");
+        if (token != null && token.startsWith("Bearer ")) {
+            token = token.substring(7);
+        }
+        boolean success = userService.updateUserInfo(token, userUpdateDTO);
+        return success ? Result.success(true) : Result.error(500, "用户信息更新失败");
+    }
+
+    @PostMapping("/change-password")
+    public Result<Boolean> changePassword(HttpServletRequest request, @RequestBody ChangePasswordDTO changePasswordDTO) {
+        String token = request.getHeader("Authorization");
+        if (token != null && token.startsWith("Bearer ")) {
+            token = token.substring(7);
+        }
+        boolean success = userService.changePassword(token, changePasswordDTO);
+        return success ? Result.success(true) : Result.error(500, "密码修改失败");
     }
 }

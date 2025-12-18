@@ -23,12 +23,20 @@ export function getUserInfo() {
   })
 }
 
-export function updateUserInfo() {
-  return Promise.reject(new Error('Backend missing /users/update'))
+export function updateUserInfo(data) {
+  return request({
+    url: '/users/update',
+    method: 'put',
+    data
+  })
 }
 
-export function changePassword() {
-  return Promise.reject(new Error('Backend missing /users/change-password'))
+export function changePassword(data) {
+  return request({
+    url: '/users/change-password',
+    method: 'post',
+    data
+  })
 }
 
 export function logout() {

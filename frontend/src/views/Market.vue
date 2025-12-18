@@ -120,33 +120,40 @@
 </template>
 
 <script>
-import { ref, onMounted, nextTick } from 'vue'
+import { ref, watch, onMounted, onBeforeUnmount, nextTick } from 'vue'
+import { useRoute } from 'vue-router'
 import * as echarts from 'echarts'
+import { getStockDetail, getStockRealtime, getStockTimeline, getStockKLine } from '@/api/stock'
 
 export default {
   name: 'Market',
   setup() {
+    const route = useRoute()
+    const stockCode = ref(route.query.stock || '002594')
+    const loading = ref(false)
     const activeTab = ref('timeline')
     const timelineChart = ref(null)
     const klineChart = ref(null)
+    const apiTimeline = ref([])
+    const apiKline = ref([])
 
     const stockData = ref({
-      price: '255.88',
-      change: '2.23',
-      changePercent: '0.88'
+      price: '--',
+      change: '--',
+      changePercent: '--'
     })
 
     const keyMetrics = ref([
-      { label: '高', value: '258.50', class: 'positive' },
-      { label: '低', value: '252.30', class: 'negative' },
-      { label: '开', value: '253.00', class: 'positive' },
-      { label: '昨收', value: '253.65', class: '' },
-      { label: '量', value: '15.2万手', class: '' },
-      { label: '额', value: '3.9亿', class: '' },
-      { label: '换手', value: '1.58%', class: '' },
-      { label: '市盈', value: '25.1', class: '' },
-      { label: '总市值', value: '7450亿', class: '' },
-      { label: '流通值', value: '4980亿', class: '' }
+      { label: '高', value: '--', class: '' },
+      { label: '低', value: '--', class: '' },
+      { label: '开', value: '--', class: '' },
+      { label: '昨收', value: '--', class: '' },
+      { label: '量', value: '--', class: '' },
+      { label: '额', value: '--', class: '' },
+      { label: '换手', value: '--', class: '' },
+      { label: '市盈', value: '--', class: '' },
+      { label: '总市值', value: '--', class: '' },
+      { label: '流通值', value: '--', class: '' }
     ])
 
     const chartTabs = [
@@ -156,29 +163,23 @@ export default {
       { label: '月K', value: 'kline-month' }
     ]
 
-    const sellOrders = ref([
-      { level: 5, price: '255.90', volume: '120' },
-      { level: 4, price: '255.89', volume: '85' },
-      { level: 3, price: '255.88', volume: '200' },
-      { level: 2, price: '255.87', volume: '150' },
-      { level: 1, price: '255.86', volume: '95' }
-    ])
+    const sellOrders = ref([])
+    const buyOrders = ref([])
+    const tickData = ref([])
 
-    const buyOrders = ref([
-      { level: 1, price: '255.85', volume: '180' },
-      { level: 2, price: '255.84', volume: '220' },
-      { level: 3, price: '255.83', volume: '165' },
-      { level: 4, price: '255.82', volume: '130' },
-      { level: 5, price: '255.81', volume: '75' }
-    ])
-
-    const tickData = ref([
-      { time: '10:30:00', price: '255.88', volume: '120', change: 0.05 },
-      { time: '10:29:30', price: '255.87', volume: '85', change: -0.02 },
-      { time: '10:29:00', price: '255.89', volume: '200', change: 0.12 },
-      { time: '10:28:30', price: '255.85', volume: '150', change: -0.08 },
-      { time: '10:28:00', price: '255.86', volume: '95', change: 0.03 }
-    ])
+    const generateOrderBook = (currentPrice) => {
+      const price = Number(currentPrice) || 255.85
+      sellOrders.value = Array.from({ length: 5 }, (_, i) => ({
+        level: 5 - i,
+        price: (price + (5 - i) * 0.01).toFixed(2),
+        volume: Math.floor(Math.random() * 200 + 50).toString()
+      }))
+      buyOrders.value = Array.from({ length: 5 }, (_, i) => ({
+        level: i + 1,
+        price: (price - (i + 1) * 0.01).toFixed(2),
+        volume: Math.floor(Math.random() * 200 + 50).toString()
+      }))
+    }
 
     // 生成分时数据
     const generateTimelineData = () => {
@@ -251,6 +252,29 @@ export default {
       }))
     }
 
+    // API数据转换
+    const buildTimelineFromApi = (list = []) => {
+      if (!Array.isArray(list) || !list.length) return null
+      return {
+        priceData: list.map(item => [item.tradeDate, Number(item.closePrice || 0).toFixed(2)]),
+        volumeData: list.map(item => [item.tradeDate, Number(item.volume || 0)])
+      }
+    }
+
+    const buildKLineFromApi = (list = []) => {
+      if (!Array.isArray(list) || !list.length) return null
+      return list.map(item => ({
+        time: item.tradeDate,
+        k: [
+          Number(item.openPrice || 0).toFixed(2),
+          Number(item.closePrice || 0).toFixed(2),
+          Number(item.lowPrice || 0).toFixed(2),
+          Number(item.highPrice || 0).toFixed(2)
+        ],
+        volume: Number(item.volume || 0)
+      }))
+    }
+
     // 初始化分时图
     const initTimelineChart = () => {
       const chartDom = document.getElementById('stockTimelineChart')
@@ -261,7 +285,17 @@ export default {
       }
 
       timelineChart.value = echarts.init(chartDom)
-      const { priceData, volumeData } = generateTimelineData()
+
+      let priceData, volumeData
+      const built = buildTimelineFromApi(apiTimeline.value)
+      if (built) {
+        priceData = built.priceData
+        volumeData = built.volumeData
+      } else {
+        const fallback = generateTimelineData()
+        priceData = fallback.priceData
+        volumeData = fallback.volumeData
+      }
       
       const option = {
         backgroundColor: 'transparent',
@@ -390,7 +424,7 @@ export default {
       }
 
       klineChart.value = echarts.init(chartDom)
-      const rawData = generateKLineData(200)
+      const rawData = buildKLineFromApi(apiKline.value) || generateKLineData(200)
       const dates = rawData.map(item => item.time)
       const kData = rawData.map(item => item.k)
       const volumes = rawData.map((item, index) => [index, item.volume, item.k[1] > item.k[0] ? 1 : -1])
@@ -448,39 +482,116 @@ export default {
       })
     }
 
-    // 模拟实时数据更新
+    // 实时数据更新
+    let realtimeInterval = null
     const startRealtimeSimulation = () => {
-      setInterval(() => {
-        // 更新价格
-        const currentPrice = parseFloat(stockData.value.price)
-        const change = (Math.random() - 0.5) * 0.1
-        const newPrice = (currentPrice + change).toFixed(2)
-        stockData.value.price = newPrice
-        
-        // 更新分时成交数据
-        const now = new Date()
-        const newTick = {
-          time: now.toTimeString().slice(0, 8),
-          price: newPrice,
-          volume: Math.floor(Math.random() * 100) + 1,
-          change: change
+      if (realtimeInterval) {
+        clearInterval(realtimeInterval)
+      }
+
+      realtimeInterval = setInterval(async () => {
+        try {
+          const res = await getStockRealtime(stockCode.value)
+          if (res?.code === 200 && res.data) {
+            const { price, change, changeAmount, volume, timestamp } = res.data
+            stockData.value.price = Number(price || stockData.value.price || 0).toFixed(2)
+            stockData.value.change = (changeAmount || change || 0).toString()
+            stockData.value.changePercent = (change || 0).toString()
+
+            tickData.value.unshift({
+              time: timestamp ? timestamp.slice(11, 19) : new Date().toTimeString().slice(0, 8),
+              price: stockData.value.price,
+              volume: volume || Math.floor(Math.random() * 100) + 1,
+              change: change || 0
+            })
+            if (tickData.value.length > 50) {
+              tickData.value.pop()
+            }
+          }
+        } catch (err) {
+          console.warn('实时更新失败', err)
         }
-        
-        tickData.value.unshift(newTick)
-        if (tickData.value.length > 50) {
-          tickData.value.pop()
+      }, 5000)
+    }
+
+    const loadStockData = async () => {
+      loading.value = true
+      try {
+        const [detailRes, timelineRes, klineRes] = await Promise.all([
+          getStockDetail(stockCode.value),
+          getStockTimeline(stockCode.value, 30),
+          getStockKLine(stockCode.value, { days: 200 })
+        ])
+
+        if (detailRes?.code === 200 && detailRes.data) {
+          const detail = detailRes.data
+          stockData.value = {
+            price: (detail.currentPrice || '--').toString(),
+            change: (detail.changePercent || detail.change || '--').toString(),
+            changePercent: (detail.changePercent || '--').toString()
+          }
+          keyMetrics.value = [
+            { label: '高', value: detail.highPrice || '--', class: '' },
+            { label: '低', value: detail.lowPrice || '--', class: '' },
+            { label: '开', value: detail.openPrice || '--', class: '' },
+            { label: '昨收', value: detail.yesterdayClose || '--', class: '' },
+            { label: '量', value: detail.volume || '--', class: '' },
+            { label: '额', value: detail.amount || '--', class: '' },
+            { label: '换手', value: detail.turnoverRate ? `${detail.turnoverRate}%` : '--', class: '' },
+            { label: '市盈', value: detail.pe || '--', class: '' },
+            { label: '总市值', value: detail.totalMarketCap || '--', class: '' },
+            { label: '流通值', value: detail.totalMarketCap || '--', class: '' }
+          ]
+          generateOrderBook(detail.currentPrice)
         }
-      }, 3000)
+
+        if (timelineRes?.code === 200 && Array.isArray(timelineRes.data)) {
+          apiTimeline.value = timelineRes.data
+        }
+        if (klineRes?.code === 200 && Array.isArray(klineRes.data)) {
+          apiKline.value = klineRes.data
+        }
+
+        nextTick(() => {
+          initTimelineChart()
+          initKLineChart()
+        })
+      } catch (err) {
+        console.error('加载股票数据失败', err)
+        nextTick(() => {
+          initTimelineChart()
+          initKLineChart()
+        })
+      } finally {
+        loading.value = false
+      }
     }
 
     onMounted(() => {
       nextTick(() => {
-        initTimelineChart()
+        loadStockData()
         startRealtimeSimulation()
       })
     })
 
+    onBeforeUnmount(() => {
+      if (realtimeInterval) {
+        clearInterval(realtimeInterval)
+      }
+    })
+
+    watch(() => route.query.stock, (newStock) => {
+      if (newStock && newStock !== stockCode.value) {
+        stockCode.value = newStock
+        tickData.value = []
+        loadStockData()
+        startRealtimeSimulation()
+      }
+    })
+
     return {
+      stockCode,
+      loading,
       activeTab,
       stockData,
       keyMetrics,
