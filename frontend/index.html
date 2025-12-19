@@ -1,14 +1,55 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
-<head>
-  <meta charset="UTF-8" />
-  <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>量融 - 智能金融投资平台</title>
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
-</head>
-<body>
-  <div id="app"></div>
-  <script type="module" src="/src/main.js"></script>
-</body>
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>InvestIQ AI 智能投研平台 | Pro Quantitative Terminal</title>
+    <style>
+      /* 初次加载动画样式 */
+      #app-loading {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background-color: #040608;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        z-index: 9999;
+      }
+      .loader {
+        width: 48px;
+        height: 48px;
+        border: 3px solid #00AFFF;
+        border-bottom-color: transparent;
+        border-radius: 50%;
+        display: inline-block;
+        box-sizing: border-box;
+        animation: rotation 1s linear infinite;
+      }
+      .loading-text {
+        color: #00AFFF;
+        margin-top: 20px;
+        font-family: sans-serif;
+        letter-spacing: 2px;
+        font-size: 14px;
+      }
+      @keyframes rotation {
+        0% { transform: rotate(0deg); }
+        100% { transform: rotate(360deg); }
+      }
+    </style>
+  </head>
+  <body>
+    <div id="app">
+      <div id="app-loading">
+        <span class="loader"></span>
+        <div class="loading-text">系统初始化中...</div>
+      </div>
+    </div>
+    <script type="module" src="/src/main.js"></script>
+  </body>
 </html>

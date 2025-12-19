@@ -14,7 +14,8 @@ public class StockDataScheduler {
 
     private final SinaDataPersistenceService persistenceService;
 
-    @EventListener(ApplicationReadyEvent.class)
+    // 暂时禁用启动时自动同步，避免与DevTools冲突
+    // @EventListener(ApplicationReadyEvent.class)
     public void updateStockDataOnStartup() {
         log.info("应用启动完成，开始更新股票价格和成交量...");
 

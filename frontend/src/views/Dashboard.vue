@@ -1,185 +1,495 @@
 <template>
   <div class="page-content active">
     <!-- 顶部 Header -->
-    <header class="header">
+    <el-header class="header card-glass" height="auto">
       <div class="header-left">
         <h2>仪表盘</h2>
-        <p>欢迎回来, Admin</p>
+        <p>欢迎回来, 尊敬的投资者</p>
       </div>
       <div class="header-right">
-        <div class="search-box" style="position: relative; z-index: 10000;">
-          <input
-            type="text"
+        <div class="search-box">
+          <el-input
             v-model="searchKeyword"
+            placeholder="搜索股票代码/名称..."
             @input="handleSearch"
-            placeholder="搜索股票代码/名称...">
-          <i class="fas fa-search" @click="handleSearch" style="cursor: pointer;"></i>
-          <div v-if="showSearchDropdown" class="search-dropdown" style="position: fixed !important; top: 60px; left: auto; right: 20px; width: 400px; background: var(--card-bg); border: 1px solid var(--border-color); border-radius: 8px; margin-top: 8px; max-height: 300px; overflow-y: auto; z-index: 99999 !important; box-shadow: 0 4px 12px rgba(0,0,0,0.3);">
-            <div v-if="searchLoading" style="padding: 12px; text-align: center; color: var(--text-secondary);">
-              <i class="fas fa-spinner fa-spin"></i> 搜索中...
+            :prefix-icon="Search"
+            clearable
+          >
+            <template #append>
+              <el-button :icon="Search" @click="handleSearch" />
+            </template>
+          </el-input>
+          
+          <el-card v-if="showSearchDropdown" class="search-dropdown-card">
+            <div v-if="searchLoading" class="loading-state">
+              <el-icon class="is-loading"><Loading /></el-icon> 搜索中...
             </div>
-            <div v-else-if="searchError" style="padding: 12px; color: var(--color-negative);">{{ searchError }}</div>
-            <div v-else-if="searchResults.length === 0" style="padding: 12px; text-align: center; color: var(--text-secondary);">暂无结果</div>
-            <div v-else>
+            <div v-else-if="searchError" class="error-state">{{ searchError }}</div>
+            <div v-else-if="searchResults.length === 0" class="empty-state">暂无结果</div>
+            <div v-else class="results-list">
               <div
                 v-for="item in searchResults"
                 :key="item.stockCode"
+                class="result-item"
                 @click="selectSearchResult(item)"
-                style="padding: 12px; cursor: pointer; border-bottom: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center;"
-                @mouseenter="$event.currentTarget.style.background = 'var(--hover-bg)'"
-                @mouseleave="$event.currentTarget.style.background = 'transparent'">
-                <span style="font-weight: 500;">{{ item.stockName }}</span>
-                <small style="color: var(--text-secondary);">{{ item.stockCode }}</small>
+              >
+                <span class="name">{{ item.stockName }}</span>
+                <el-tag size="small" type="info">{{ item.stockCode }}</el-tag>
               </div>
             </div>
-          </div>
+          </el-card>
         </div>
-        <div class="user-profile">
-          <img src="https://i.pravatar.cc/40?u=admin" alt="User Avatar">
-        </div>
+        
+        <el-avatar :size="42" src="https://i.pravatar.cc/40?u=admin" border />
       </div>
-    </header>
+    </el-header>
 
     <!-- 内容网格 -->
-    <div class="content-grid">
+    <el-row :gutter="20" class="mt-4">
       <!-- 主要市场指数 -->
-      <div class="card index-card">
-        <div
-          v-for="(index, idx) in topIndices"
-          :key="index.code"
-          class="index-item"
-          @click="selectTopIndex(index.code)"
-        >
-          <div class="index-info">
-            <p>{{ index.name }}</p>
-            <h3 :class="index.change >= 0 ? 'positive' : 'negative'">{{ index.price }}</h3>
-            <span :class="index.change >= 0 ? 'positive' : 'negative'">
-              {{ index.change >= 0 ? '+' : '' }}{{ index.change }} ({{ index.changePercent }}%)
-            </span>
-          </div>
-          <div :id="'miniChart' + idx" class="mini-chart"></div>
-        </div>
-      </div>
+      <el-col :span="24">
+        <el-row :gutter="15">
+          <el-col :span="8" v-for="(index, idx) in topIndices" :key="index.code">
+            <el-card shadow="hover" class="index-card-new" @click="selectTopIndex(index.code)">
+              <div class="index-main">
+                <div class="index-label">{{ index.name }}</div>
+                <div class="index-value" :class="index.change >= 0 ? 'positive' : 'negative'">
+                  {{ index.price }}
+                </div>
+                <div class="index-change" :class="index.change >= 0 ? 'positive' : 'negative'">
+                  <el-icon><CaretTop v-if="index.change >= 0" /><CaretBottom v-else /></el-icon>
+                  {{ index.change >= 0 ? '+' : '' }}{{ index.change }} ({{ index.changePercent }}%)
+                </div>
+              </div>
+              <div :id="'miniChart' + idx" class="mini-chart-new"></div>
+            </el-card>
+          </el-col>
+        </el-row>
+      </el-col>
 
       <!-- 主图表卡片 -->
-      <div class="card chart-card-large">
-        <div class="card-header">
-          <h3>{{ currentIndex.name }}</h3>
-          <div class="index-selector">
-            <select v-model="selectedIndex" @change="changeIndex">
-              <option v-for="index in indices" :key="index.code" :value="index.code">
-                {{ index.name }}
-              </option>
-            </select>
-          </div>
-          <div class="time-selector">
-            <button
-              v-for="period in periods"
-              :key="period.value"
-              :class="{ active: selectedPeriod === period.value }"
-              @click="changePeriod(period.value)"
-            >
-              {{ period.label }}
-            </button>
-          </div>
-        </div>
-        
-        <!-- 价格信息显示 -->
-        <div class="price-info">
-          <div class="current-price">
-            <span class="price-label">当前价格</span>
-            <span class="price-value" :class="currentPriceData.change >= 0 ? 'positive' : 'negative'">
-              {{ currentPriceData.price }}
-            </span>
-            <span class="price-change" :class="currentPriceData.change >= 0 ? 'positive' : 'negative'">
-              {{ currentPriceData.change >= 0 ? '+' : '' }}{{ currentPriceData.change }}
-            </span>
-            <span class="price-percent" :class="currentPriceData.change >= 0 ? 'positive' : 'negative'">
-              ({{ currentPriceData.changePercent }}%)
-            </span>
-          </div>
-        </div>
-        
-        <div id="mainKLineChart" class="chart-container"></div>
-      </div>
-
-      <!-- 市场概况 -->
-      <div class="card market-overview-card">
-        <div class="card-header">
-          <h3>市场概况</h3>
-          <span class="update-time" style="color: var(--text-secondary); font-size: 0.85rem;">更新时间: {{ marketOverview.updateTime }}</span>
-        </div>
-        <div class="stat-row">
-          <div class="stat-item">
-            <span class="stat-label">上涨家数</span>
-            <span class="stat-value positive" style="color: #00C087 !important; font-size: 1.75rem !important; font-weight: 700 !important;">{{ marketOverview.upCount }}</span>
-          </div>
-          <div class="stat-item">
-            <span class="stat-label">下跌家数</span>
-            <span class="stat-value negative" style="color: #FF4D4F !important; font-size: 1.75rem !important; font-weight: 700 !important;">{{ marketOverview.downCount }}</span>
-          </div>
-          <div class="stat-item">
-            <span class="stat-label">涨停家数</span>
-            <span class="stat-value positive" style="color: #00C087 !important; font-size: 1.75rem !important; font-weight: 700 !important;">{{ marketOverview.limitUpCount }}</span>
-          </div>
-          <div class="stat-item">
-            <span class="stat-label">跌停家数</span>
-            <span class="stat-value negative" style="color: #FF4D4F !important; font-size: 1.75rem !important; font-weight: 700 !important;">{{ marketOverview.limitDownCount }}</span>
-          </div>
-          <div class="stat-item">
-            <span class="stat-label">总成交额</span>
-            <span class="stat-value" style="color: #FFFFFF !important; font-size: 1.75rem !important; font-weight: 700 !important;">{{ marketOverview.totalVolume }}</span>
-          </div>
-          <div class="stat-item">
-            <span class="stat-label">换手率</span>
-            <span class="stat-value" style="color: #FFFFFF !important; font-size: 1.75rem !important; font-weight: 700 !important;">{{ marketOverview.turnoverRate }}</span>
-          </div>
-        </div>
-      </div>
-
-      <!-- 我的自选 -->
-      <div class="card watchlist-card">
-        <div class="card-header">
-          <h3>我的自选</h3>
-          <a href="#" class="view-all">管理全部 <i class="fas fa-arrow-right"></i></a>
-        </div>
-        <ul class="watchlist">
-          <li
-            v-for="stock in watchlistStocks"
-            :key="stock.code"
-            class="watchlist-item"
-          >
-            <div class="stock-info">
-              <span>{{ stock.name }}</span><small>{{ stock.code }}</small>
-            </div>
-            <div class="stock-details">
-              <div class="stock-price" :class="stock.change >= 0 ? 'positive' : 'negative'">
-                <span>{{ stock.price }}</span>
+      <el-col :span="16" class="mt-4">
+        <el-card shadow="never" class="main-chart-card">
+          <template #header>
+            <div class="card-header-flex">
+              <div class="header-title">
+                <el-icon class="mr-2"><DataLine /></el-icon>
+                <span>{{ currentIndex.name }} 行情走势</span>
               </div>
-              <div class="stock-change" :class="stock.change >= 0 ? 'positive' : 'negative'">
-                <span>{{ stock.change >= 0 ? '+' : '' }}{{ stock.change }}</span>
-                <small>{{ stock.changePercent }}%</small>
+              <div class="header-actions">
+                <el-select v-model="selectedIndex" @change="changeIndex" style="width: 130px; margin-right: 12px;">
+                  <el-option v-for="index in indices" :key="index.code" :label="index.name" :value="index.code" />
+                </el-select>
+                <el-radio-group v-model="selectedPeriod" size="small" @change="changePeriod">
+                  <el-radio-button v-for="p in periods" :key="p.value" :label="p.value">
+                    {{ p.label }}
+                  </el-radio-button>
+                </el-radio-group>
               </div>
             </div>
-          </li>
-        </ul>
-      </div>
+          </template>
+          
+          <div class="price-banner">
+            <el-statistic :value="parseFloat(currentPriceData.price.replace(/,/g, ''))" :precision="2" :value-style="{ color: currentPriceData.change >= 0 ? 'var(--color-positive)' : 'var(--color-negative)' }">
+              <template #title>
+                <div style="display: flex; align-items: center; gap: 8px;">
+                  <span>实时价格</span>
+                  <span :class="currentPriceData.change >= 0 ? 'positive' : 'negative'">
+                    {{ currentPriceData.change >= 0 ? '+' : '' }}{{ currentPriceData.change }} ({{ currentPriceData.changePercent }}%)
+                  </span>
+                </div>
+              </template>
+            </el-statistic>
+          </div>
+          
+          <div id="mainKLineChart" style="width: 100%; height: 450px;"></div>
+        </el-card>
+      </el-col>
 
-      <!-- AI 投资建议 -->
-      <div class="card advice-card">
-        <div class="card-header">
-          <h3>最新智能投顾建议</h3>
-          <a href="#" class="view-all">查看详情 <i class="fas fa-arrow-right"></i></a>
-        </div>
-        <div class="advice-content">
-          <i class="fas fa-robot"></i>
-          <p>根据您的 "稳健增长型" 偏好和最新市场数据，建议关注 <b>新能源汽车</b> 板块。可考虑在价格回调时适度建仓 <b>比亚迪 (002594)</b>。</p>
-          <small>由 "我的增长模型 V2" 生成 - 2023-10-27 10:30</small>
-        </div>
-      </div>
-    </div>
+      <el-col :span="8" class="mt-4">
+        <el-space direction="vertical" fill :size="20" style="width: 100%">
+          <!-- 市场概况 -->
+          <el-card shadow="never" class="stat-card">
+            <template #header>
+              <div class="card-header-flex">
+                <span>市场概览</span>
+                <el-tag type="info" size="small">更新: {{ marketOverview.updateTime }}</el-tag>
+              </div>
+            </template>
+            <el-row :gutter="10">
+              <el-col :span="12" v-for="stat in marketStats" :key="stat.label">
+                <div class="stat-box">
+                  <div class="stat-label">{{ stat.label }}</div>
+                  <div class="stat-value" :class="stat.class">{{ stat.value }}</div>
+                </div>
+              </el-col>
+            </el-row>
+          </el-card>
+
+          <!-- 我的自选 -->
+          <el-card shadow="never" class="watchlist-card-new">
+            <template #header>
+              <div class="card-header-flex">
+                <span>我的自选</span>
+                <el-button link type="primary" @click="router.push('/watchlist')">管理全部 <el-icon><ArrowRight /></el-icon></el-button>
+              </div>
+            </template>
+            <div class="watchlist-list">
+              <div v-for="stock in watchlistStocks" :key="stock.code" class="watchlist-row" @click="router.push(`/market?stock=${stock.code}`)">
+                <div class="w-info">
+                  <div class="name">{{ stock.name }}</div>
+                  <div class="code">{{ stock.code }}</div>
+                </div>
+                <div class="w-price" :class="stock.change >= 0 ? 'positive' : 'negative'">{{ stock.price }}</div>
+                <div class="w-change">
+                  <el-tag :type="stock.change >= 0 ? 'success' : 'danger'" size="small">
+                    {{ stock.change >= 0 ? '+' : '' }}{{ stock.changePercent }}%
+                  </el-tag>
+                </div>
+              </div>
+            </div>
+          </el-card>
+
+          <!-- AI 投资建议 -->
+          <el-card shadow="never" class="ai-advice-card">
+            <div class="ai-header">
+              <el-avatar :size="32" class="ai-avatar"><el-icon><Cpu /></el-icon></el-avatar>
+              <span class="ai-title">智能投顾引擎</span>
+            </div>
+            <div class="ai-body">
+              <p>根据您的风险偏好，当前建议关注 <span class="highlight">新能源汽车</span> 板块。技术面显示 <b>比亚迪</b> 有望在均线处获得支撑。</p>
+            </div>
+            <div class="ai-footer">
+              Generated by LLM-V2 • 10:30
+            </div>
+          </el-card>
+        </el-space>
+      </el-col>
+    </el-row>
   </div>
 </template>
+
+<script setup>
+import { ref, computed, onMounted, nextTick } from 'vue'
+import { useRouter } from 'vue-router'
+import * as echarts from 'echarts'
+import { Search, CaretTop, CaretBottom, DataLine, ArrowRight, Cpu, Loading } from '@element-plus/icons-vue'
+import { searchStock, getWatchlist, getMarketIndices, getMarketOverview, getIndexKLine } from '@/api/stock'
+import { useAuthStore } from '@/stores/auth'
+
+const router = useRouter()
+const authStore = useAuthStore()
+const selectedPeriod = ref('timeline')
+const selectedIndex = ref('000001')
+const chartInstance = ref(null)
+const currentPriceData = ref({
+  price: '3,145.80',
+  change: 12.50,
+  changePercent: '+0.40'
+})
+
+const searchKeyword = ref('')
+const searchResults = ref([])
+const searchLoading = ref(false)
+const searchError = ref('')
+const showSearchDropdown = computed(() => searchKeyword.value && (searchLoading.value || searchError.value || searchResults.value.length > 0))
+
+const periods = [
+  { label: '分时', value: 'timeline' },
+  { label: '日K', value: 'daily' },
+  { label: '周K', value: 'weekly' },
+  { label: '月K', value: 'monthly' }
+]
+
+const indices = [
+  { code: '000001', name: '上证指数' },
+  { code: '399001', name: '深证成指' },
+  { code: '399006', name: '创业板指' },
+  { code: '000300', name: '沪深300' }
+]
+
+const currentIndex = computed(() => indices.find(i => i.code === selectedIndex.value) || indices[0])
+
+const marketOverview = ref({
+  upCount: '--',
+  downCount: '--',
+  limitUpCount: '--',
+  limitDownCount: '--',
+  totalVolume: '--',
+  turnoverRate: '--',
+  updateTime: new Date().toLocaleTimeString()
+})
+
+const marketStats = computed(() => [
+  { label: '上涨家数', value: marketOverview.value.upCount, class: 'positive' },
+  { label: '下跌家数', value: marketOverview.value.downCount, class: 'negative' },
+  { label: '涨停家数', value: marketOverview.value.limitUpCount, class: 'positive' },
+  { label: '跌停家数', value: marketOverview.value.limitDownCount, class: 'negative' },
+  { label: '成交额', value: marketOverview.value.totalVolume, class: '' },
+  { label: '换手率', value: marketOverview.value.turnoverRate, class: '' }
+])
+
+const topIndices = ref([
+  { code: '000001', name: '上证指数', price: '--', change: 0, changePercent: '0.00' },
+  { code: '399001', name: '深证成指', price: '--', change: 0, changePercent: '0.00' },
+  { code: '399006', name: '创业板指', price: '--', change: 0, changePercent: '0.00' }
+])
+
+const watchlistStocks = ref([])
+
+// 图表颜色方案
+const chartColors = {
+  up: '#39D353',
+  down: '#F85149',
+  ma5: '#FF6B6B',
+  ma10: '#4ECDC4',
+  ma20: '#45B7D1',
+  ma30: '#96CEB4'
+}
+
+const loadMarketIndices = async () => {
+  try {
+    const res = await getMarketIndices()
+    if (res?.code === 200 && Array.isArray(res.data)) {
+      topIndices.value = res.data.map(item => ({
+        code: item.stockCode,
+        name: item.stockName,
+        price: Number(item.currentPrice || 0).toFixed(2),
+        change: Number(item.change || 0).toFixed(2),
+        changePercent: Number(item.changePercent || 0).toFixed(2)
+      }))
+
+      const current = res.data.find(item => item.stockCode === selectedIndex.value)
+      if (current) {
+        currentPriceData.value = {
+          price: Number(current.currentPrice || 0).toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ','),
+          change: Number(current.change || 0).toFixed(2),
+          changePercent: Number(current.changePercent || 0).toFixed(2)
+        }
+      }
+    }
+  } catch (err) {
+    console.warn('获取大盘指数失败', err)
+  }
+}
+
+const loadMarketOverview = async () => {
+  try {
+    const res = await getMarketOverview()
+    if (res?.code === 200 && res.data) {
+      marketOverview.value = {
+        upCount: res.data.upCount ?? '--',
+        downCount: res.data.downCount ?? '--',
+        limitUpCount: res.data.limitUpCount ?? '--',
+        limitDownCount: res.data.limitDownCount ?? '--',
+        totalVolume: res.data.totalVolume ?? '--',
+        turnoverRate: res.data.turnoverRate ?? '--',
+        updateTime: res.data.updateTime ? new Date(res.data.updateTime).toLocaleTimeString() : new Date().toLocaleTimeString()
+      }
+    }
+  } catch (err) {
+    console.warn('获取市场概况失败', err)
+  }
+}
+
+// 初始化迷你图
+const initMiniCharts = () => {
+  topIndices.value.forEach((index, idx) => {
+    const chartDom = document.getElementById('miniChart' + idx)
+    if (!chartDom) return
+    const miniChart = echarts.init(chartDom)
+    const data = Array.from({length: 20}, () => Math.random() * 10 + 100)
+    const isPositive = index.change >= 0
+
+    miniChart.setOption({
+      grid: { left: 0, right: 0, top: 10, bottom: 0 },
+      xAxis: { type: 'category', show: false },
+      yAxis: { type: 'value', show: false, scale: true },
+      series: [{
+        type: 'line',
+        data: data,
+        smooth: true,
+        symbol: 'none',
+        lineStyle: { width: 2, color: isPositive ? chartColors.up : chartColors.down },
+        areaStyle: {
+          color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+            { offset: 0, color: isPositive ? `${chartColors.up}44` : `${chartColors.down}44` },
+            { offset: 1, color: 'transparent' }
+          ])
+        }
+      }]
+    })
+  })
+}
+
+// 主图表初始化 (分时图)
+const initTimelineChart = () => {
+  const chartDom = document.getElementById('mainKLineChart')
+  if (!chartDom || chartInstance.value) chartInstance.value?.dispose()
+  chartInstance.value = echarts.init(chartDom)
+
+  const times = Array.from({length: 240}, (_, i) => `${Math.floor(i/60)+9}:${(i%60).toString().padStart(2,'0')}`)
+  const prices = Array.from({length: 240}, () => 3100 + Math.random()*50)
+
+  chartInstance.value.setOption({
+    tooltip: { trigger: 'axis', axisPointer: { type: 'cross' } },
+    grid: { left: '3%', right: '3%', bottom: '3%', top: '5%', containLabel: true },
+    xAxis: { type: 'category', data: times, axisLine: { lineStyle: { color: '#30363D' } } },
+    yAxis: { type: 'value', scale: true, splitLine: { lineStyle: { color: '#30363D' } } },
+    series: [{
+      name: '价格',
+      type: 'line',
+      data: prices,
+      smooth: true,
+      symbol: 'none',
+      lineStyle: { width: 2, color: '#00A6FF' },
+      areaStyle: {
+        color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+          { offset: 0, color: 'rgba(0, 166, 255, 0.2)' },
+          { offset: 1, color: 'transparent' }
+        ])
+      }
+    }]
+  })
+}
+
+const changePeriod = (val) => {
+  if (val === 'timeline') initTimelineChart()
+  else initKLineChart()
+}
+
+const changeIndex = () => initTimelineChart()
+const selectTopIndex = (code) => {
+  selectedIndex.value = code
+  initTimelineChart()
+}
+
+const handleSearch = async () => {
+  if (!searchKeyword.value) return searchResults.value = []
+  searchLoading.value = true
+  try {
+    const res = await searchStock(searchKeyword.value)
+    searchResults.value = res.data || []
+  } finally { searchLoading.value = false }
+}
+
+const selectSearchResult = (item) => {
+  router.push(`/market?stock=${item.stockCode}`)
+}
+
+onMounted(() => {
+  loadMarketIndices().then(() => initMiniCharts())
+  loadMarketOverview()
+  loadWatchlist()
+  initTimelineChart()
+})
+
+const loadWatchlist = async () => {
+  const userId = authStore.userId || localStorage.getItem('userId')
+  if (!userId) return
+  const res = await getWatchlist(userId)
+  watchlistStocks.value = (res.data || []).slice(0, 5).map(i => ({
+    name: i.stockName,
+    code: i.stockCode,
+    price: i.currentPrice || '--',
+    change: i.changePercent || 0,
+    changePercent: i.changePercent || 0
+  }))
+}
+</script>
+
+<style scoped>
+.mt-4 { margin-top: 1.5rem; }
+.mr-2 { margin-right: 0.5rem; }
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1rem 2rem;
+  margin-bottom: 1rem;
+}
+
+.header-left h2 { font-size: 1.5rem; font-weight: 700; color: var(--text-primary); }
+.header-left p { color: var(--text-secondary); font-size: 0.9rem; }
+
+.search-box { position: relative; width: 300px; margin-right: 20px; }
+.search-dropdown-card {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  z-index: 2000;
+  margin-top: 8px;
+}
+
+.index-card-new {
+  position: relative;
+  overflow: hidden;
+  height: 140px;
+  cursor: pointer;
+  border: 1px solid var(--border-color);
+}
+
+.index-main { position: relative; z-index: 2; }
+.index-label { font-size: 0.9rem; color: var(--text-secondary); }
+.index-value { font-size: 1.8rem; font-weight: 700; margin: 4px 0; }
+.index-change { font-size: 0.95rem; display: flex; align-items: center; gap: 4px; }
+
+.mini-chart-new {
+  position: absolute;
+  bottom: -10px;
+  right: -10px;
+  width: 150px;
+  height: 80px;
+  opacity: 0.6;
+}
+
+.card-header-flex { display: flex; justify-content: space-between; align-items: center; }
+.header-title { display: flex; align-items: center; font-weight: 600; }
+
+.price-banner {
+  padding: 1rem;
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 8px;
+  margin-bottom: 1rem;
+}
+
+.stat-box {
+  padding: 12px;
+  background: rgba(255, 255, 255, 0.02);
+  border-radius: 8px;
+  margin-bottom: 10px;
+  border: 1px solid var(--border-color);
+}
+.stat-label { font-size: 0.8rem; color: var(--text-tertiary); margin-bottom: 4px; }
+.stat-value { font-size: 1.2rem; font-weight: 600; }
+
+.watchlist-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 8px;
+  border-bottom: 1px solid var(--border-color);
+  cursor: pointer;
+  transition: var(--transition-fast);
+}
+.watchlist-row:hover { background: rgba(255, 255, 255, 0.05); }
+.w-info .name { font-weight: 500; font-size: 0.95rem; }
+.w-info .code { font-size: 0.8rem; color: var(--text-tertiary); }
+.w-price { font-family: monospace; font-weight: 600; }
+
+.ai-advice-card {
+  background: linear-gradient(135deg, rgba(0, 166, 255, 0.1), transparent);
+  border: 1px solid rgba(0, 166, 255, 0.2);
+}
+.ai-header { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
+.ai-avatar { background: var(--primary-accent); }
+.ai-title { font-weight: 600; color: var(--primary-accent); }
+.ai-body p { font-size: 0.95rem; line-height: 1.6; }
+.highlight { color: var(--primary-accent); font-weight: 600; }
+.ai-footer { margin-top: 12px; font-size: 0.75rem; color: var(--text-tertiary); }
+</style>
 
 <script>
 import { ref, computed, onMounted, nextTick } from 'vue'

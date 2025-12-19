@@ -1,186 +1,300 @@
 <template>
   <div class="page-content active">
-    <header class="header">
+    <!-- 顶部标题 -->
+    <el-header class="header card-glass mb-6" height="auto">
       <div class="header-left">
-        <h2>智能投顾</h2>
-        <p>AI驱动的个性化投资建议</p>
+        <h2>智能投顾中心</h2>
+        <p>基于大模型的深度市场分析与个性化建议</p>
       </div>
       <div class="header-right">
-        <div class="search-box">
-          <input type="text" placeholder="搜索投顾建议...">
-          <i class="fas fa-search"></i>
-        </div>
+        <el-button type="primary" :icon="MagicStick" size="large" :loading="loading" @click="generateAdvice">
+          生成全新投资策略
+        </el-button>
       </div>
-    </header>
+    </el-header>
 
-    <div class="content-grid">
-      <!-- 风险说明弹窗 -->
-      <div class="modal-overlay" v-if="showRiskModal" @click="showRiskModal = false">
-        <div class="modal-content" @click.stop>
-          <div class="modal-header">
-            <h3>风险承受能力说明</h3>
-            <button class="modal-close" @click="showRiskModal = false">×</button>
-          </div>
-          <div class="modal-body">
-            <div class="risk-item" v-for="level in riskLevels" :key="level.value">
-              <div class="risk-title">{{ level.code }} - {{ level.label }}</div>
-              <div class="risk-desc">{{ level.definition }}</div>
-              <div class="risk-loss">可接受亏损：{{ level.lossLevel }}</div>
-            </div>
-          </div>
-        </div>
-      </div>
+    <el-tabs v-model="activeMainTab" class="advisor-tabs">
+      <!-- 偏好设置标签页 -->
+      <el-tab-pane label="投资偏好配置" name="preferences">
+        <el-row :gutter="20">
+          <el-col :span="16">
+            <el-card shadow="never" class="preference-card">
+              <el-form :model="preferences" label-position="top">
+                <el-form-item label="风险承受能力评估">
+                  <el-radio-group v-model="preferences.risk" class="risk-radio-group">
+                    <el-radio v-for="level in riskLevels" :key="level.value" :label="level.value" border>
+                      <div class="risk-item-content">
+                        <span class="label">{{ level.label }}</span>
+                        <span class="desc">{{ level.desc }}</span>
+                      </div>
+                    </el-radio>
+                  </el-radio-group>
+                  <el-button link type="primary" @click="showRiskModal = true" class="mt-2">查看详细等级定义</el-button>
+                </el-form-item>
 
-      <div class="card" style="grid-column: 1 / -1;">
-        <div class="card-header">
-          <h3>投资偏好设置</h3>
+                <el-form-item label="投资期限偏好">
+                  <el-radio-group v-model="preferences.term">
+                    <el-radio-button v-for="term in investmentTerms" :key="term.value" :label="term.value">
+                      {{ term.label }}
+                    </el-radio-button>
+                  </el-radio-group>
+                </el-form-item>
+
+                <el-form-item label="关注行业板块 (多选)">
+                  <el-collapse class="industry-collapse">
+                    <el-collapse-item v-for="category in industryCategories" :key="category.name" :title="category.name">
+                      <el-checkbox-group v-model="preferences.industries">
+                        <el-checkbox v-for="item in category.items" :key="item" :label="item">{{ item }}</el-checkbox>
+                      </el-checkbox-group>
+                    </el-collapse-item>
+                  </el-collapse>
+                </el-form-item>
+
+                <el-button type="primary" size="large" :loading="saving" @click="savePreferences" style="width: 200px">
+                  保存并同步配置
+                </el-button>
+              </el-form>
+            </el-card>
+          </el-col>
+          
+          <el-col :span="8">
+            <el-card shadow="never" class="chart-card-new">
+              <template #header><span>配置均衡度分析</span></template>
+              <div id="portfolioAnalysisChart" style="height: 400px;"></div>
+            </el-card>
+          </el-col>
+        </el-row>
+      </el-tab-pane>
+
+      <!-- 投资建议标签页 -->
+      <el-tab-pane label="AI 深度建议" name="advices">
+        <div v-if="advices.length === 0" class="empty-state-container">
+          <el-empty description="暂无建议，点击右上角按钮生成您的第一份 AI 投资报告" />
         </div>
-        <div class="preference-settings">
-          <div class="preference-group" :class="{ 'has-error': errors.risk }">
-            <h4>风险承受能力 <span class="required">*</span> <span class="info-icon" @click="showRiskModal = true" title="点击查看风险等级说明">ⓘ</span></h4>
-            <div class="preference-options">
-              <label class="radio-option" v-for="level in riskLevels" :key="level.value">
-                <input type="radio" name="risk" :value="level.value" v-model="preferences.risk">
-                <span class="radio-check"></span>
-                <span class="radio-label">{{ level.label }} <small>{{ level.desc }}</small></span>
-              </label>
-            </div>
-            <span v-if="errors.risk" class="error-msg">{{ errors.risk }}</span>
-          </div>
-          <div class="preference-group" :class="{ 'has-error': errors.term }">
-            <h4>投资期限 <span class="required">*</span></h4>
-            <div class="preference-options">
-              <label class="radio-option" v-for="term in investmentTerms" :key="term.value">
-                <input type="radio" name="term" :value="term.value" v-model="preferences.term">
-                <span class="radio-check"></span>
-                <span class="radio-label">{{ term.label }} <small>{{ term.desc }}</small></span>
-              </label>
-            </div>
-            <span v-if="errors.term" class="error-msg">{{ errors.term }}</span>
-          </div>
-          <div class="preference-group" :class="{ 'has-error': errors.industries }">
-            <h4>关注行业 <span class="required">*</span> <small class="selected-count">(已选 {{ preferences.industries.length }} 个，至少选1个)</small></h4>
-            <div class="industry-select-group">
-              <div v-for="category in industryCategories" :key="category.name" class="industry-category">
-                <div class="category-title">{{ category.name }}</div>
-                <div class="industry-options">
-                  <label v-for="industry in category.items" :key="industry" class="checkbox-option">
-                    <input type="checkbox" :value="industry" v-model="preferences.industries">
-                    <span class="checkbox-check"></span>
-                    <span class="checkbox-label">{{ industry }}</span>
-                  </label>
+        
+        <div v-else class="advice-container">
+          <div v-for="advice in advices" :key="advice.id" class="advice-card-item">
+            <el-card shadow="hover">
+              <template #header>
+                <div class="flex-between">
+                  <div class="flex-align-center">
+                    <el-avatar :size="32" class="ai-avatar mr-2"><el-icon><Cpu /></el-icon></el-avatar>
+                    <span class="font-bold">深度研报 - {{ advice.time }}</span>
+                  </div>
+                  <el-tag effect="plain" type="success">{{ advice.model }}</el-tag>
+                </div>
+              </template>
+
+              <!-- 结构化内容 -->
+              <div class="advice-sections">
+                <el-row :gutter="20">
+                  <el-col :span="12" v-if="advice.parsed?.worldSituation">
+                    <div class="info-section">
+                      <h4><el-icon><Global /></el-icon> {{ advice.parsed.worldSituation.title }}</h4>
+                      <p>{{ advice.parsed.worldSituation.content }}</p>
+                    </div>
+                  </el-col>
+                  <el-col :span="12" v-if="advice.parsed?.nationalPolicy">
+                    <div class="info-section">
+                      <h4><el-icon><OfficeBuilding /></el-icon> {{ advice.parsed.nationalPolicy.title }}</h4>
+                      <p>{{ advice.parsed.nationalPolicy.content }}</p>
+                    </div>
+                  </el-col>
+                </el-row>
+
+                <el-divider />
+
+                <div v-if="advice.parsed?.recommendations" class="rec-grid">
+                  <h4 class="mb-4">💡 核心建议标的</h4>
+                  <el-row :gutter="20">
+                    <el-col :span="12" v-for="rec in advice.parsed.recommendations" :key="rec.code">
+                      <div class="stock-rec-card">
+                        <div class="stock-header">
+                          <div>
+                            <span class="name">{{ rec.name }}</span>
+                            <span class="code">{{ rec.code }}</span>
+                          </div>
+                          <el-tag :type="rec.suggestedAction === 'BUY' ? 'success' : 'warning'">
+                            {{ rec.suggestedAction === 'BUY' ? '建议买入' : '建议关注' }}
+                          </el-tag>
+                        </div>
+                        <p class="thesis">{{ rec.thesis }}</p>
+                        <el-descriptions :column="2" border size="small">
+                          <el-descriptions-item label="买入区间">¥{{ rec.entryPriceStart }}-{{ rec.entryPriceEnd }}</el-descriptions-item>
+                          <el-descriptions-item label="目标价"><span class="positive">¥{{ rec.takeProfitPrice }}</span></el-descriptions-item>
+                          <el-descriptions-item label="止损价"><span class="negative">¥{{ rec.stopLossPrice }}</span></el-descriptions-item>
+                        </el-descriptions>
+                      </div>
+                    </el-col>
+                  </el-row>
                 </div>
               </div>
-            </div>
-            <span v-if="errors.industries" class="error-msg">{{ errors.industries }}</span>
-          </div>
-          <button class="auth-btn" style="margin-top: 1rem; align-self: flex-start;" @click="savePreferences" :disabled="saving">
-            <span class="btn-text">{{ saving ? '保存中...' : '保存偏好设置' }}</span>
-          </button>
-        </div>
-      </div>
-
-      <div class="card advice-card-large" style="grid-column: 1 / -1;">
-        <div class="card-header">
-          <h3>最新智能投顾建议</h3>
-          <button class="auth-btn" @click="generateAdvice" :disabled="loading" style="margin-left: auto; padding: 0.5rem 1rem;">
-            <span class="btn-text">{{ loading ? '生成中...' : '生成新建议' }}</span>
-          </button>
-          <div class="filter-tabs">
-            <button 
-              v-for="filter in filters" 
-              :key="filter.value"
-              :class="{ active: activeFilter === filter.value }"
-              @click="activeFilter = filter.value"
-            >
-              {{ filter.label }}
-            </button>
+            </el-card>
           </div>
         </div>
-        <div class="advice-list">
-          <div
-            v-for="advice in filteredAdvices"
-            :key="advice.id"
-            class="advice-item"
-          >
-            <div class="advice-header">
-              <div class="advice-type" :class="advice.type">{{ advice.typeLabel }}</div>
-              <div class="advice-time">{{ advice.time }}</div>
-            </div>
+      </el-tab-pane>
+    </el-tabs>
 
-            <div class="advice-content-structured">
-              <!-- 世界形势分析 -->
-              <div v-if="advice.parsed?.worldSituation" class="analysis-section">
-                <h4 class="section-title">🌍 {{ advice.parsed.worldSituation.title }}</h4>
-                <p class="section-content">{{ advice.parsed.worldSituation.content }}</p>
-              </div>
-
-              <!-- 国家政策解读 -->
-              <div v-if="advice.parsed?.nationalPolicy" class="analysis-section">
-                <h4 class="section-title">🏛️ {{ advice.parsed.nationalPolicy.title }}</h4>
-                <p class="section-content">{{ advice.parsed.nationalPolicy.content }}</p>
-              </div>
-
-              <!-- 行业趋势研判 -->
-              <div v-if="advice.parsed?.industryTrends" class="analysis-section">
-                <h4 class="section-title">📊 {{ advice.parsed.industryTrends.title }}</h4>
-                <p class="section-content">{{ advice.parsed.industryTrends.content }}</p>
-              </div>
-
-              <!-- 个股深度分析 -->
-              <div v-if="advice.parsed?.companyOverview" class="analysis-section">
-                <h4 class="section-title">🏢 {{ advice.parsed.companyOverview.title }}</h4>
-                <p class="section-content">{{ advice.parsed.companyOverview.content }}</p>
-              </div>
-
-              <!-- 投资建议 -->
-              <div v-if="advice.parsed?.recommendations?.length" class="recommendations-section">
-                <h4 class="section-title">💡 投资建议</h4>
-                <div v-for="rec in advice.parsed.recommendations" :key="rec.code" class="recommendation-card">
-                  <div class="rec-header">
-                    <div class="rec-stock">
-                      <span class="rec-name">{{ rec.name }}</span>
-                      <span class="rec-code">{{ rec.code }}</span>
-                    </div>
-                    <div class="rec-action" :class="rec.suggestedAction.toLowerCase()">
-                      {{ rec.suggestedAction === 'BUY' ? '买入' : rec.suggestedAction === 'SELL' ? '卖出' : '持有' }}
-                    </div>
-                  </div>
-                  <div class="rec-thesis">{{ rec.thesis }}</div>
-                  <div class="rec-prices">
-                    <div class="price-item">
-                      <span class="price-label">建议买入区间</span>
-                      <span class="price-value">¥{{ rec.entryPriceStart }} - ¥{{ rec.entryPriceEnd }}</span>
-                    </div>
-                    <div class="price-item">
-                      <span class="price-label">目标价</span>
-                      <span class="price-value positive">¥{{ rec.takeProfitPrice }}</span>
-                    </div>
-                    <div class="price-item">
-                      <span class="price-label">止损价</span>
-                      <span class="price-value negative">¥{{ rec.stopLossPrice }}</span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <div class="advice-model">
-                <i class="fas fa-robot"></i> 由 "{{ advice.model }}" 生成
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-      
-      <div class="card">
-        <div class="card-header">
-          <h3>投资组合分析</h3>
-        </div>
-        <div id="portfolioAnalysisChart" class="chart-container" style="height: 300px;"></div>
-      </div>
-    </div>
+    <!-- 风险说明对话框 -->
+    <el-dialog v-model="showRiskModal" title="风险承受能力评级说明" width="600px">
+      <el-table :data="riskLevels" border stripe>
+        <el-table-column property="code" label="代码" width="60" />
+        <el-table-column property="label" label="等级" width="100" />
+        <el-table-column property="definition" label="定义描述" />
+      </el-table>
+    </el-dialog>
   </div>
 </template>
+
+<script setup>
+import { ref, reactive, computed, onMounted, nextTick } from 'vue'
+import { useRouter } from 'vue-router'
+import * as echarts from 'echarts'
+import { MagicStick, Cpu, OfficeBuilding, Connection as Global } from '@element-plus/icons-vue'
+import { ElMessage } from 'element-plus'
+import { savePreference, getPreference } from '@/api/preference'
+import { adviceApi } from '@/api/advice'
+import { useAuthStore } from '@/stores/auth'
+
+const authStore = useAuthStore()
+const router = useRouter()
+const activeMainTab = ref('preferences')
+const loading = ref(false)
+const saving = ref(false)
+const showRiskModal = ref(false)
+
+const preferences = ref({ risk: null, term: '', industries: [] })
+const advices = ref([])
+
+const industryCategories = [
+  { name: '大消费板块', items: ['食品饮料', '医药生物', '汽车', '家用电器', '农林牧渔'] },
+  { name: 'TMT/大科技', items: ['电子', '计算机', '通信', '传媒'] },
+  { name: '周期与资源', items: ['石油石化', '煤炭', '有色金属', '钢铁'] },
+  { name: '新能源与高端制造', items: ['电力设备', '机械设备', '国防军工'] },
+  { name: '金融地产', items: ['银行', '非银金融', '房地产'] }
+]
+
+const riskLevels = [
+  { value: 1, code: 'C1', label: '保守型', desc: '首要保本', definition: '对风险极度敏感，不愿承受本金损失。' },
+  { value: 2, code: 'C2', label: '稳健型', desc: '小幅波动', definition: '愿意承担较小的本金风险，追求略高于通胀。' },
+  { value: 3, code: 'C3', label: '平衡型', desc: '收益风险均衡', definition: '在风险和收益之间寻求平衡，可接受一定亏损。' },
+  { value: 4, code: 'C4', label: '积极型', desc: '追求高回报', definition: '愿意承担较大风险以换取较高的预期回报。' },
+  { value: 5, code: 'C5', label: '激进型', desc: '高收益高风险', definition: '承受能力极强，追求资本快速增值。' }
+]
+
+const investmentTerms = [
+  { value: '短期1-6月', label: '1-6个月 (短期)' },
+  { value: '短期6-12月', label: '6-12个月 (中期)' },
+  { value: '长期', label: '1年以上 (长期)' }
+]
+
+const loadAdvices = async () => {
+  const uid = authStore.userId || localStorage.getItem('userId')
+  if (!uid) return
+  try {
+    const res = await adviceApi.getUserAdvice(uid)
+    if (res.data) {
+      const content = typeof res.data.content === 'string' ? JSON.parse(res.data.content) : res.data.content
+      advices.value = [{
+        id: res.data.id,
+        time: new Date(res.data.createdAt).toLocaleString(),
+        parsed: content,
+        model: 'GPT-4o Finance Turbo'
+      }]
+    }
+  } catch (e) { console.warn('建议加载失败', e) }
+}
+
+const generateAdvice = async () => {
+  const uid = authStore.userId || localStorage.getItem('userId')
+  loading.value = true
+  try {
+    await adviceApi.createAdvice(uid)
+    ElMessage.success('投顾建议已生成！')
+    activeMainTab.value = 'advices'
+    loadAdvices()
+  } catch (e) { ElMessage.error('生成失败') }
+  finally { loading.value = false }
+}
+
+const savePreferences = async () => {
+  const uid = authStore.userId || localStorage.getItem('userId')
+  saving.value = true
+  try {
+    await savePreference({
+      userId: uid,
+      riskToleranceLevel: preferences.value.risk,
+      investmentHorizonPreset: preferences.value.term,
+      preferredIndustry: preferences.value.industries.join(',')
+    })
+    ElMessage.success('设置已保存')
+  } finally { saving.value = false }
+}
+
+const initCharts = () => {
+  const dom = document.getElementById('portfolioAnalysisChart')
+  if (!dom) return
+  const chart = echarts.init(dom)
+  chart.setOption({
+    backgroundColor: 'transparent',
+    radar: {
+      indicator: [
+        { name: '成长性', max: 100 }, { name: '价值性', max: 100 }, { name: '稳定性', max: 100 },
+        { name: '收益性', max: 100 }, { name: '流动性', max: 100 }
+      ],
+      axisLine: { lineStyle: { color: '#30363D' } },
+      splitLine: { lineStyle: { color: '#30363D' } },
+      splitArea: { show: false }
+    },
+    series: [{
+      type: 'radar',
+      data: [{
+        value: [85, 70, 90, 75, 80],
+        name: '当前配置',
+        areaStyle: { color: 'rgba(0, 166, 255, 0.4)' },
+        lineStyle: { color: '#00AFFF', width: 2 }
+      }]
+    }]
+  })
+}
+
+onMounted(() => {
+  getPreference(authStore.userId).then(res => {
+    if (res.data) {
+      preferences.value.risk = res.data.riskToleranceLevel
+      preferences.value.term = res.data.investmentHorizonPreset
+      preferences.value.industries = res.data.preferredIndustry ? res.data.preferredIndustry.split(',') : []
+    }
+  })
+  loadAdvices()
+  nextTick(() => initCharts())
+})
+</script>
+
+<style scoped>
+.advisor-tabs :deep(.el-tabs__header) { margin-bottom: 2rem; }
+.advisor-tabs :deep(.el-tabs__nav-wrap::after) { display: none; }
+
+.risk-radio-group { display: flex; flex-direction: column; gap: 10px; width: 100%; }
+.risk-radio-group :deep(.el-radio) { margin-right: 0; width: 100%; height: auto; padding: 12px 20px; }
+.risk-item-content { display: flex; flex-direction: column; }
+.risk-item-content .label { font-weight: 700; font-size: 1rem; }
+.risk-item-content .desc { font-size: 0.8rem; color: var(--text-tertiary); margin-top: 4px; }
+
+.industry-collapse { border: 1px solid var(--border-color); border-radius: 8px; overflow: hidden; }
+
+.advice-card-item { margin-bottom: 2rem; }
+.info-section h4 { color: var(--primary-accent); display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }
+.info-section p { line-height: 1.8; color: var(--text-secondary); font-size: 0.95rem; text-align: justify; }
+
+.stock-rec-card { background: rgba(0,0,0,0.2); border: 1px solid var(--border-color); border-radius: 12px; padding: 1.5rem; }
+.stock-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; }
+.stock-header .name { font-size: 1.2rem; font-weight: 700; margin-right: 10px; }
+.stock-header .code { font-family: monospace; color: var(--text-tertiary); }
+.thesis { font-size: 0.9rem; color: var(--text-secondary); line-height: 1.6; margin-bottom: 1.5rem; padding-left: 10px; border-left: 3px solid var(--primary-accent); }
+
+.empty-state-container { padding: 5rem 0; }
+</style>
 
 <script>
 import { ref, reactive, computed, onMounted, nextTick } from 'vue'

@@ -1,12 +1,12 @@
 import request from './request'
 
 export const backtestApi = {
-  runBacktest() {
-    return Promise.reject(new Error('Backend missing /backtest/run'))
-  },
-
-  getHistory() {
-    return Promise.reject(new Error('Backend missing /backtest/history'))
+  runBacktest(data) {
+    return request({
+      url: '/backtest/run',
+      method: 'post',
+      data
+    })
   },
 
   getDetail(adviceId) {

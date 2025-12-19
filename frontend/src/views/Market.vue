@@ -1,123 +1,300 @@
 <template>
   <div class="page-content active">
-    <header class="header">
+    <!-- 头部信息 -->
+    <el-header class="header card-glass mb-4" height="auto">
       <div class="header-left">
-        <h2>个股行情</h2>
-        <p>{{ stockData.name || '--' }} ({{ stockData.code || stockCode }})</p>
+        <div class="flex-align-center">
+          <el-tag effect="dark" class="mr-2">{{ stockData.exchange || '交易所' }}</el-tag>
+          <h2 class="stock-name">{{ stockData.name || '--' }}</h2>
+          <span class="stock-code-tag">{{ stockData.code || stockCode }}</span>
+        </div>
+        <p class="text-tertiary mt-1">实时行情监控中...</p>
       </div>
-    </header>
+      <div class="header-right">
+        <div class="main-price-display" :class="stockData.change >= 0 ? 'positive' : 'negative'">
+          <div class="price-val">{{ stockData.price }}</div>
+          <div class="price-change-group">
+            <span>{{ stockData.change >= 0 ? '+' : '' }}{{ stockData.change }}</span>
+            <span>({{ stockData.changePercent }}%)</span>
+          </div>
+        </div>
+      </div>
+    </el-header>
   
-    <div class="card stock-detail-container">
-      <!-- 左侧：图表区域 -->
-      <div class="chart-section">
-        <!-- 顶部核心信息区 -->
-        <div class="stock-overview-pro">
-          <div class="main-price-info">
-            <span class="exchange-tag">{{ stockData.exchange || '--' }}</span>
-            <h1>{{ stockData.name || '--' }}</h1>
-            <span class="stock-code-pro">{{ stockData.code || stockCode }}</span>
-            <div class="current-price positive">
-              <span class="price">{{ stockData.price }}</span>
-              <span class="change">+{{ stockData.change }}</span>
-              <span class="change-percent">+{{ stockData.changePercent }}%</span>
-            </div>
+    <el-row :gutter="20">
+      <!-- 左侧：图表与基本面 -->
+      <el-col :span="18">
+        <el-card shadow="never" class="chart-main-card">
+          <el-tabs v-model="activeTab" class="custom-tabs" @tab-change="switchTab">
+            <el-tab-pane v-for="tab in chartTabs" :key="tab.value" :label="tab.label" :name="tab.value" />
+          </el-tabs>
+          
+          <div class="chart-viewport">
+            <div id="stockTimelineChart" class="chart-el" v-show="activeTab === 'timeline'"></div>
+            <div id="stockKLineChart" class="chart-el" v-show="activeTab.startsWith('kline')"></div>
           </div>
-          <div class="key-metrics-grid">
-            <div 
-              v-for="metric in keyMetrics" 
-              :key="metric.label"
-              class="metric-item"
-            >
-              <span class="label">{{ metric.label }}</span>
-              <span 
-                class="value" 
-                :class="metric.class"
-              >{{ metric.value }}</span>
-            </div>
-          </div>
-        </div>
-        <!-- 图表区域 -->
-        <div class="chart-tabs-pro">
-          <div class="tabs-header-pro">
-            <button 
-              v-for="tab in chartTabs" 
-              :key="tab.value"
-              class="tab-button-pro"
-              :class="{ active: activeTab === tab.value }"
-              @click="switchTab(tab.value)"
-            >
-              {{ tab.label }}
-            </button>
-          </div>
-          <div class="tab-content-pro active">
-            <div 
-              id="stockTimelineChart" 
-              class="main-chart-container"
-              v-show="activeTab === 'timeline'"
-            ></div>
-            <div 
-              id="stockKLineChart" 
-              class="main-chart-container"
-              v-show="activeTab.startsWith('kline')"
-            ></div>
-          </div>
-        </div>
-      </div>
+        </el-card>
 
-      <!-- 右侧：数据区域 -->
-      <div class="data-section">
-        <!-- 五档盘口 -->
-        <div class="order-book-card">
-          <ul class="order-list" id="sell-orders">
-            <li 
-              v-for="order in sellOrders" 
-              :key="'sell-' + order.level"
-              class="order-list-item"
-            >
-              <span class="order-label">卖{{ order.level }}</span>
-              <span class="order-price negative">{{ order.price }}</span>
-              <span class="order-volume">{{ order.volume }}</span>
-            </li>
-          </ul>
-          <div class="current-price-divider">{{ stockData.price }}</div>
-          <ul class="order-list" id="buy-orders">
-            <li 
-              v-for="order in buyOrders" 
-              :key="'buy-' + order.level"
-              class="order-list-item"
-            >
-              <span class="order-label">买{{ order.level }}</span>
-              <span class="order-price positive">{{ order.price }}</span>
-              <span class="order-volume">{{ order.volume }}</span>
-            </li>
-          </ul>
-        </div>
-        <!-- 分时成交 -->
-        <div class="tick-data-card">
-          <div class="tick-header">
-            <span>时间</span>
-            <span>价格</span>
-            <span>成交量(手)</span>
-          </div>
-          <ul class="tick-list" id="tick-list-container">
-            <li 
-              v-for="tick in tickData" 
-              :key="tick.time"
-              class="tick-item"
-            >
-              <span class="time">{{ tick.time }}</span>
-              <span 
-                class="price" 
-                :class="tick.change >= 0 ? 'positive' : 'negative'"
-              >{{ tick.price }}</span>
-              <span class="volume">{{ tick.volume }}</span>
-            </li>
-          </ul>
-        </div>
-      </div>
-    </div>
+        <!-- 基本面指标 -->
+        <el-card shadow="never" class="mt-4 metrics-card">
+          <template #header>
+            <div class="flex-between">
+              <span class="font-bold"><el-icon class="mr-1"><InfoFilled /></el-icon>关键指标</span>
+              <el-tag size="small" type="success">实时数据</el-tag>
+            </div>
+          </template>
+          <el-descriptions :column="5" border size="small">
+            <el-descriptions-item v-for="metric in keyMetrics" :key="metric.label" :label="metric.label">
+              <span :class="metric.class" class="font-mono font-bold">{{ metric.value }}</span>
+            </el-descriptions-item>
+          </el-descriptions>
+        </el-card>
+      </el-col>
+
+      <!-- 右侧：五档与成交 -->
+      <el-col :span="6">
+        <el-space direction="vertical" fill style="width: 100%" :size="20">
+          <!-- 五档报价 -->
+          <el-card shadow="never" class="orderbook-card">
+            <template #header><span>五档报价</span></template>
+            <div class="orderbook-body">
+              <div class="sell-side">
+                <div v-for="order in sellOrders" :key="order.level" class="order-row">
+                  <span class="label">卖{{ order.level }}</span>
+                  <span class="price negative">{{ order.price }}</span>
+                  <span class="volume">{{ order.volume }}</span>
+                </div>
+              </div>
+              <div class="price-divider">
+                <div class="current" :class="stockData.change >= 0 ? 'bg-pos' : 'bg-neg'">
+                  {{ stockData.price }}
+                </div>
+              </div>
+              <div class="buy-side">
+                <div v-for="order in buyOrders" :key="order.level" class="order-row">
+                  <span class="label">买{{ order.level }}</span>
+                  <span class="price positive">{{ order.price }}</span>
+                  <span class="volume">{{ order.volume }}</span>
+                </div>
+              </div>
+            </div>
+          </el-card>
+
+          <!-- 逐笔成交 -->
+          <el-card shadow="never" class="ticks-card">
+            <template #header><span>逐笔成交</span></template>
+            <div class="ticks-header">
+              <span>时间</span><span>价格</span><span>量</span>
+            </div>
+            <el-scrollbar height="300px">
+              <div v-for="tick in tickData" :key="tick.time" class="tick-row">
+                <span class="time">{{ tick.time }}</span>
+                <span class="price" :class="tick.change >= 0 ? 'positive' : 'negative'">{{ tick.price }}</span>
+                <span class="vol">{{ tick.volume }}</span>
+              </div>
+            </el-scrollbar>
+          </el-card>
+        </el-space>
+      </el-col>
+    </el-row>
   </div>
 </template>
+
+<script setup>
+import { ref, watch, onMounted, onBeforeUnmount, nextTick } from 'vue'
+import { useRoute } from 'vue-router'
+import * as echarts from 'echarts'
+import { InfoFilled, TrendCharts } from '@element-plus/icons-vue'
+import { getStockRealtime, getStockTimeline, getStockKLine, getEastMoneyQuote } from '@/api/stock'
+
+const route = useRoute()
+const stockCode = ref(route.query.stock || '002594')
+const activeTab = ref('timeline')
+const timelineChart = ref(null)
+const klineChart = ref(null)
+const apiTimeline = ref([])
+const apiKline = ref([])
+
+const stockData = ref({
+  name: '--',
+  code: stockCode.value,
+  exchange: '--',
+  price: '--',
+  change: 0,
+  changePercent: '0.00'
+})
+
+const keyMetrics = ref([])
+const chartTabs = [
+  { label: '分时图', value: 'timeline' },
+  { label: '日K线', value: 'kline-daily' },
+  { label: '周K线', value: 'kline-week' },
+  { label: '月K线', value: 'kline-month' }
+]
+
+const sellOrders = ref([])
+const buyOrders = ref([])
+const tickData = ref([])
+
+// 初始化图表颜色
+const colors = { up: '#39D353', down: '#F85149', primary: '#00A6FF' }
+
+const loadStockData = async () => {
+  try {
+    const [realtimeRes, timelineRes, klineRes, eastmoneyRes] = await Promise.all([
+      getStockRealtime(stockCode.value),
+      getStockTimeline(stockCode.value, 30),
+      getStockKLine(stockCode.value, { days: 200 }),
+      getEastMoneyQuote(stockCode.value)
+    ])
+
+    if (realtimeRes?.code === 200 && realtimeRes.data) {
+      const d = realtimeRes.data
+      stockData.value = {
+        name: d.stockName || '--',
+        code: d.stockCode,
+        exchange: d.stockCode.startsWith('6') ? 'SH' : 'SZ',
+        price: Number(d.currentPrice || 0).toFixed(2),
+        change: Number(d.change || 0).toFixed(2),
+        changePercent: Number(d.changePercent || 0).toFixed(2)
+      }
+      
+      const em = eastmoneyRes?.code === 200 ? eastmoneyRes.data : {}
+      keyMetrics.value = [
+        { label: '最高', value: d.highPrice || '--', class: 'positive' },
+        { label: '最低', value: d.lowPrice || '--', class: 'negative' },
+        { label: '今开', value: d.openPrice || '--', class: '' },
+        { label: '昨收', value: d.preClosePrice || '--', class: '' },
+        { label: '成交量', value: (d.volume / 10000).toFixed(2) + '万', class: '' },
+        { label: '成交额', value: (d.amount / 100000000).toFixed(2) + '亿', class: '' },
+        { label: '换手率', value: (em.turnoverRate || 0).toFixed(2) + '%', class: '' },
+        { label: '市盈率', value: (em.pe || 0).toFixed(2), class: '' },
+        { label: '总市值', value: (em.totalMarketCap / 100000000).toFixed(2) + '亿', class: '' },
+        { label: '流通值', value: (em.circulationMarketCap / 100000000).toFixed(2) + '亿', class: '' }
+      ]
+
+      // 生成盘口模拟
+      sellOrders.value = Array.from({length: 5}, (_, i) => ({
+        level: 5 - i,
+        price: (Number(d.currentPrice) + (5-i)*0.01).toFixed(2),
+        volume: Math.floor(Math.random() * 500)
+      }))
+      buyOrders.value = Array.from({length: 5}, (_, i) => ({
+        level: i + 1,
+        price: (Number(d.currentPrice) - (i+1)*0.01).toFixed(2),
+        volume: Math.floor(Math.random() * 500)
+      }))
+    }
+
+    if (timelineRes?.code === 200) apiTimeline.value = timelineRes.data
+    if (klineRes?.code === 200) apiKline.value = klineRes.data
+
+    nextTick(() => {
+      initTimelineChart()
+      initKLineChart()
+    })
+  } catch (err) {
+    console.error('加载行情失败', err)
+  }
+}
+
+const initTimelineChart = () => {
+  const chartDom = document.getElementById('stockTimelineChart')
+  if (!chartDom) return
+  if (timelineChart.value) timelineChart.value.dispose()
+  timelineChart.value = echarts.init(chartDom)
+  
+  const data = apiTimeline.value.map(i => [i.tradeDate, i.closePrice])
+  timelineChart.value.setOption({
+    grid: { left: '4%', right: '4%', top: '5%', bottom: '5%', containLabel: true },
+    tooltip: { trigger: 'axis' },
+    xAxis: { type: 'category', data: data.map(i => i[0]), axisLine: { lineStyle: { color: '#30363D' } } },
+    yAxis: { type: 'value', scale: true, splitLine: { lineStyle: { color: '#30363D' } } },
+    series: [{
+      type: 'line',
+      data: data.map(i => i[1]),
+      smooth: true,
+      symbol: 'none',
+      lineStyle: { width: 2, color: colors.primary },
+      areaStyle: {
+        color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+          { offset: 0, color: 'rgba(0, 166, 255, 0.2)' },
+          { offset: 1, color: 'transparent' }
+        ])
+      }
+    }]
+  })
+}
+
+const initKLineChart = () => {
+  const chartDom = document.getElementById('stockKLineChart')
+  if (!chartDom) return
+  if (klineChart.value) klineChart.value.dispose()
+  klineChart.value = echarts.init(chartDom)
+  
+  const data = apiKline.value.map(i => [i.openPrice, i.closePrice, i.lowPrice, i.highPrice])
+  klineChart.value.setOption({
+    grid: { left: '4%', right: '4%', top: '5%', bottom: '5%', containLabel: true },
+    tooltip: { trigger: 'axis' },
+    xAxis: { type: 'category', data: apiKline.value.map(i => i.tradeDate), axisLine: { lineStyle: { color: '#30363D' } } },
+    yAxis: { type: 'value', scale: true, splitLine: { lineStyle: { color: '#30363D' } } },
+    series: [{
+      type: 'candlestick',
+      data: data,
+      itemStyle: { color: colors.up, color0: colors.down, borderColor: colors.up, borderColor0: colors.down }
+    }]
+  })
+}
+
+const switchTab = () => {
+  nextTick(() => {
+    if (activeTab.value === 'timeline') initTimelineChart()
+    else initKLineChart()
+  })
+}
+
+onMounted(() => loadStockData())
+
+watch(() => route.query.stock, (val) => {
+  if (val) {
+    stockCode.value = val
+    loadStockData()
+  }
+})
+</script>
+
+<style scoped>
+.header { display: flex; justify-content: space-between; align-items: center; padding: 1.5rem 2rem; }
+.stock-name { font-size: 1.8rem; font-weight: 700; margin-right: 1rem; }
+.stock-code-tag { font-size: 1.2rem; color: var(--text-tertiary); font-family: monospace; }
+.main-price-display { text-align: right; }
+.price-val { font-size: 2.4rem; font-weight: 800; font-family: 'Inter', sans-serif; line-height: 1; }
+.price-change-group { font-size: 1rem; font-weight: 600; margin-top: 4px; }
+
+.chart-main-card { min-height: 500px; }
+.chart-viewport { height: 420px; width: 100%; position: relative; }
+.chart-el { height: 100%; width: 100%; }
+
+.custom-tabs :deep(.el-tabs__nav-wrap::after) { display: none; }
+.custom-tabs :deep(.el-tabs__item) { font-weight: 600; font-size: 1rem; }
+
+.orderbook-body { display: flex; flex-direction: column; gap: 4px; }
+.order-row { display: flex; justify-content: space-between; font-size: 0.9rem; padding: 4px 8px; border-radius: 4px; transition: background 0.2s; }
+.order-row:hover { background: rgba(255, 255, 255, 0.05); }
+.order-row .label { color: var(--text-tertiary); width: 40px; }
+.order-row .price { font-weight: 700; flex: 1; text-align: right; margin-right: 15px; }
+.order-row .volume { color: var(--text-secondary); width: 60px; text-align: right; }
+
+.price-divider { margin: 10px 0; padding: 8px 0; border-top: 1px dashed var(--border-color); border-bottom: 1px dashed var(--border-color); text-align: center; }
+.price-divider .current { display: inline-block; padding: 4px 20px; border-radius: 4px; font-weight: 800; font-size: 1.2rem; }
+.bg-pos { background: rgba(57, 211, 83, 0.15); color: var(--color-positive); }
+.bg-neg { background: rgba(248, 81, 73, 0.15); color: var(--color-negative); }
+
+.ticks-header { display: flex; justify-content: space-between; padding: 8px; font-size: 0.8rem; color: var(--text-tertiary); border-bottom: 1px solid var(--border-color); }
+.tick-row { display: flex; justify-content: space-between; padding: 6px 8px; font-size: 0.85rem; border-bottom: 1px solid rgba(255, 255, 255, 0.02); }
+.tick-row .time { color: var(--text-tertiary); }
+.tick-row .price { font-weight: 600; }
+</style>
 
 <script>
 import { ref, watch, onMounted, onBeforeUnmount, nextTick } from 'vue'
@@ -456,9 +633,9 @@ export default {
         ],
         dataZoom: [{ type: 'inside', xAxisIndex: [0, 1, 2], start: 80, end: 100 }],
         series: [
-          { type: 'candlestick', name: '日K', data: kData, itemStyle: { color: 'var(--color-positive)', color0: 'var(--color-negative)', borderColor: 'var(--color-positive)', borderColor0: 'var(--color-negative)' } },
-          { type: 'bar', name: 'Volume', data: volumes, xAxisIndex: 1, yAxisIndex: 1, itemStyle: { color: ({ value }) => (value[2] === 1 ? 'var(--color-positive)' : 'var(--color-negative)') } },
-          { name: 'MACD', type: 'bar', data: macdData.map(d => d.macd), xAxisIndex: 2, yAxisIndex: 2, itemStyle: { color: ({ value }) => (value > 0 ? 'var(--color-positive)' : 'var(--color-negative)') } },
+          { type: 'candlestick', name: '日K', data: kData, itemStyle: { color: colors.up, color0: colors.down, borderColor: colors.up, borderColor0: colors.down } },
+          { type: 'bar', name: 'Volume', data: volumes, xAxisIndex: 1, yAxisIndex: 1, itemStyle: { color: ({ value }) => (value[2] === 1 ? colors.up : colors.down) } },
+          { name: 'MACD', type: 'bar', data: macdData.map(d => d.macd), xAxisIndex: 2, yAxisIndex: 2, itemStyle: { color: ({ value }) => (value > 0 ? colors.up : colors.down) } },
           { name: 'DIF', type: 'line', data: macdData.map(d => d.diff), symbol: 'none', lineStyle: { width: 1 }, xAxisIndex: 2, yAxisIndex: 2 },
           { name: 'DEA', type: 'line', data: macdData.map(d => d.dea), symbol: 'none', lineStyle: { width: 1 }, xAxisIndex: 2, yAxisIndex: 2 }
         ]

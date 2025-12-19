@@ -3,7 +3,7 @@ import axios from 'axios'
 // 创建axios实例
 const request = axios.create({
   baseURL: '/api',
-  timeout: 10000,
+  timeout: 60000, // 增加到60秒，因为回测需要实时获取数据
   headers: {
     'Content-Type': 'application/json'
   }

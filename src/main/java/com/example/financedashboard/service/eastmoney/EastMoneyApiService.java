@@ -37,6 +37,29 @@ public class EastMoneyApiService {
         return null;
     }
 
+    public String fetchStockKLine(String stockCode, int days) {
+        String secid = convertToSecid(stockCode);
+        String url = String.format(
+            "https://push2his.eastmoney.com/api/qt/stock/kline/get?secid=%s&fields1=f1,f2,f3,f4,f5,f6&fields2=f51,f52,f53,f54,f55,f56,f57,f58,f59,f60,f61&klt=101&fqt=1&end=20500101&lmt=%d",
+            secid, days
+        );
+
+        Request request = new Request.Builder()
+            .url(url)
+            .addHeader("User-Agent", "Mozilla/5.0")
+            .addHeader("Referer", "https://quote.eastmoney.com/")
+            .build();
+
+        try (Response response = okHttpClient.newCall(request).execute()) {
+            if (response.isSuccessful() && response.body() != null) {
+                return response.body().string();
+            }
+        } catch (Exception e) {
+            log.error("获取股票K线失败: {}", stockCode, e);
+        }
+        return null;
+    }
+
     public String fetchStockQuote(String stockCode) {
         String secid = convertToSecid(stockCode);
         String url = String.format(

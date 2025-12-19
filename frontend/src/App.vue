@@ -2,10 +2,12 @@
   <router-view />
 </template>
 
-<script>
-export default {
-  name: 'App'
-}
+<script setup>
+import { onMounted } from 'vue'
+
+onMounted(() => {
+  document.documentElement.classList.add('dark')
+})
 </script>
 
 <style>

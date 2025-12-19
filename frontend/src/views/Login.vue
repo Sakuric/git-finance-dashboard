@@ -1,135 +1,251 @@
 <template>
   <div class="login-page">
-    <!-- 粒子背景 -->
+    <!-- 动态背景层 -->
     <div class="particles-bg">
-      <div class="particle" v-for="n in 60" :key="n"></div>
+      <div class="particle" v-for="n in 30" :key="n" :style="getParticleStyle(n)"></div>
     </div>
     
-    <!-- 网格线背景 -->
-    <div class="grid-bg"></div>
-    
-    <!-- 光晕效果 -->
     <div class="glow-orb glow-1"></div>
     <div class="glow-orb glow-2"></div>
     
-    <!-- 登录卡片 - 居中 -->
-    <div class="login-card">
-      <!-- Logo -->
-      <div class="login-logo">
-        <i class="fas fa-chart-pie"></i>
-        <h1>量融</h1>
-      </div>
-      <p class="login-subtitle">智能金融投资平台</p>
-      
-      <!-- 登录表单 -->
-      <div v-show="currentForm === 'login'">
-        <div class="test-info">
-          <span>测试账号: testuser</span>
-          <span>密码: 123456</span>
+    <!-- 登录容器 -->
+    <transition name="el-zoom-in-center">
+      <el-card class="login-card-new" shadow="always">
+        <div class="login-header">
+          <el-icon class="logo-icon" :size="48"><TrendCharts /></el-icon>
+          <h1>InvestIQ AI</h1>
+          <p>智能金融投资决策系统</p>
         </div>
-        
-        <form @submit.prevent="handleLogin">
-          <div class="input-field" :class="{ error: loginErrors.username }">
-            <i class="fas fa-user"></i>
-            <input
-              type="text"
-              id="login-username"
-              name="username"
-              autocomplete="username"
-              v-model="loginForm.username"
-              placeholder="用户名/邮箱"
-              @blur="validateLoginField('username')"
-            >
-            <span class="error-msg" v-if="loginErrors.username">{{ loginErrors.username }}</span>
-          </div>
 
-          <div class="input-field" :class="{ error: loginErrors.password }">
-            <i class="fas fa-lock"></i>
-            <input
-              :type="showPassword ? 'text' : 'password'"
-              id="login-password"
-              name="password"
-              autocomplete="current-password"
-              v-model="loginForm.password"
-              placeholder="密码"
-              @blur="validateLoginField('password')"
-            >
-            <button type="button" class="eye-btn" @click="showPassword = !showPassword">
-              <i :class="showPassword ? 'fas fa-eye-slash' : 'fas fa-eye'"></i>
-            </button>
-            <span class="error-msg" v-if="loginErrors.password">{{ loginErrors.password }}</span>
+        <!-- 登录表单 -->
+        <div v-if="currentForm === 'login'" class="form-wrapper">
+          <el-alert title="测试账号: testuser / 123456" type="info" :closable="false" show-icon class="mb-6" />
+          
+          <el-form :model="loginForm" label-position="top" @submit.prevent="handleLogin">
+            <el-form-item label="用户名">
+              <el-input 
+                v-model="loginForm.username" 
+                placeholder="请输入用户名/邮箱" 
+                :prefix-icon="User"
+                size="large"
+              />
+            </el-form-item>
+            
+            <el-form-item label="密码">
+              <el-input 
+                v-model="loginForm.password" 
+                type="password" 
+                placeholder="请输入密码" 
+                :prefix-icon="Lock"
+                show-password
+                size="large"
+              />
+            </el-form-item>
+
+            <div class="flex-between mb-4">
+              <el-checkbox v-model="loginForm.rememberMe">记住我</el-checkbox>
+              <el-button link type="primary" @click="showForgotModal = true">忘记密码？</el-button>
+            </div>
+
+            <el-button type="primary" class="w-full" size="large" :loading="loading" @click="handleLogin">
+              立即登录
+            </el-button>
+            
+            <el-button class="w-full mt-4" size="large" plain @click="quickLogin">
+              <el-icon class="mr-2"><Flashlight /></el-icon> 极速登录
+            </el-button>
+          </el-form>
+          
+          <div class="switch-link">
+            还没有账户？<el-link type="primary" @click="currentForm = 'register'">立即注册</el-link>
           </div>
+        </div>
+
+        <!-- 注册表单 -->
+        <div v-else class="form-wrapper">
+          <el-form :model="registerForm" label-position="top">
+            <el-form-item label="用户名">
+              <el-input v-model="registerForm.username" placeholder="3-20个字符" :prefix-icon="User" size="large" />
+            </el-form-item>
+            <el-form-item label="电子邮箱">
+              <el-input v-model="registerForm.email" placeholder="接收通知邮件" :prefix-icon="Message" size="large" />
+            </el-form-item>
+            <el-form-item label="密码">
+              <el-input v-model="registerForm.password" type="password" placeholder="至少6位字符" :prefix-icon="Lock" show-password size="large" />
+            </el-form-item>
+            
+            <el-button type="primary" class="w-full mt-4" size="large" :loading="loading" @click="handleRegister">
+              完成注册
+            </el-button>
+          </el-form>
           
-          <div class="form-options">
-            <label class="remember-me">
-              <input type="checkbox" v-model="loginForm.rememberMe">
-              <span>记住我</span>
-            </label>
-            <a href="#" @click.prevent="showForgotModal = true">忘记密码？</a>
+          <div class="switch-link">
+            已有账户？<el-link type="primary" @click="currentForm = 'login'">返回登录</el-link>
           </div>
-          
-          <button type="submit" class="login-btn" :disabled="loading">
-            <span v-if="!loading">登 录</span>
-            <i v-else class="fas fa-spinner fa-spin"></i>
-          </button>
-          
-          <button type="button" class="quick-login-btn" @click="quickLogin" :disabled="loading">
-            <i class="fas fa-bolt"></i>
-            快速登录
-          </button>
-        </form>
-        
-        <p class="switch-form">
-          还没有账户？<a href="#" @click.prevent="currentForm = 'register'">立即注册</a>
-        </p>
-      </div>
-      
-      <!-- 注册表单 -->
-      <div v-show="currentForm === 'register'">
-        <form @submit.prevent="handleRegister">
-          <div class="input-field" :class="{ error: registerErrors.username }">
-            <i class="fas fa-user"></i>
-            <input type="text" v-model="registerForm.username" placeholder="用户名 (3-20字符)" @blur="validateRegisterField('username')">
-            <span class="error-msg" v-if="registerErrors.username">{{ registerErrors.username }}</span>
-          </div>
-          
-          <div class="input-field" :class="{ error: registerErrors.email }">
-            <i class="fas fa-envelope"></i>
-            <input type="email" v-model="registerForm.email" placeholder="邮箱" @blur="validateRegisterField('email')">
-            <span class="error-msg" v-if="registerErrors.email">{{ registerErrors.email }}</span>
-          </div>
-          
-          <div class="input-field" :class="{ error: registerErrors.password }">
-            <i class="fas fa-lock"></i>
-            <input type="password" v-model="registerForm.password" placeholder="密码 (至少6位)" @blur="validateRegisterField('password')">
-            <span class="error-msg" v-if="registerErrors.password">{{ registerErrors.password }}</span>
-          </div>
-          
-          <div class="input-field" :class="{ error: registerErrors.confirmPassword }">
-            <i class="fas fa-lock"></i>
-            <input type="password" v-model="registerForm.confirmPassword" placeholder="确认密码" @blur="validateRegisterField('confirmPassword')">
-            <span class="error-msg" v-if="registerErrors.confirmPassword">{{ registerErrors.confirmPassword }}</span>
-          </div>
-          
-          <button type="submit" class="login-btn" :disabled="loading">
-            <span v-if="!loading">注 册</span>
-            <i v-else class="fas fa-spinner fa-spin"></i>
-          </button>
-        </form>
-        
-        <p class="switch-form">
-          已有账户？<a href="#" @click.prevent="currentForm = 'login'">立即登录</a>
-        </p>
-      </div>
-    </div>
-    
-    <!-- 通知 -->
-    <div class="toast" :class="{ show: toast.show, success: toast.type === 'success', error: toast.type === 'error' }">
-      <i :class="toast.type === 'success' ? 'fas fa-check-circle' : 'fas fa-exclamation-circle'"></i>
-      {{ toast.message }}
-    </div>
+        </div>
+      </el-card>
+    </transition>
   </div>
 </template>
+
+<script setup>
+import { ref, reactive } from 'vue'
+import { useRouter } from 'vue-router'
+import { useAuthStore } from '@/stores/auth'
+import { User, Lock, Message, TrendCharts, MagicStick as Flashlight } from '@element-plus/icons-vue'
+import { ElMessage } from 'element-plus'
+import * as userApi from '@/api/user'
+
+const router = useRouter()
+const authStore = useAuthStore()
+
+const currentForm = ref('login')
+const loading = ref(false)
+const loginForm = reactive({ username: '', password: '', rememberMe: false })
+const registerForm = reactive({ username: '', email: '', password: '' })
+
+const getParticleStyle = (n) => ({
+  left: `${Math.random() * 100}%`,
+  animationDelay: `${Math.random() * 5}s`,
+  animationDuration: `${5 + Math.random() * 5}s`
+})
+
+const quickLogin = () => {
+  loginForm.username = 'testuser'
+  loginForm.password = '123456'
+  handleLogin()
+}
+
+const handleLogin = async () => {
+  if (!loginForm.username || !loginForm.password) {
+    return ElMessage.warning('请填写完整的登录信息')
+  }
+  
+  loading.value = true
+  try {
+    const res = await userApi.login(loginForm)
+    if (res.code === 200) {
+      authStore.login(loginForm.username, res.data)
+      ElMessage.success('欢迎回来！正在进入系统...')
+      setTimeout(() => router.push('/dashboard'), 800)
+    } else {
+      ElMessage.error(res.message || '账号或密码错误')
+    }
+  } catch (e) {
+    ElMessage.error('服务连接失败，请稍后再试')
+  } finally {
+    loading.value = false
+  }
+}
+
+const handleRegister = async () => {
+  loading.value = true
+  try {
+    const res = await userApi.register(registerForm)
+    if (res.code === 200) {
+      ElMessage.success('注册成功，请登录')
+      currentForm.value = 'login'
+    } else {
+      ElMessage.error(res.message || '注册失败')
+    }
+  } finally {
+    loading.value = false
+  }
+}
+</script>
+
+<style scoped>
+.login-page {
+  height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: #040608;
+  position: relative;
+  overflow: hidden;
+}
+
+.login-card-new {
+  width: 440px;
+  background: rgba(13, 17, 23, 0.8) !important;
+  backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.1) !important;
+  border-radius: 20px !important;
+  z-index: 10;
+}
+
+.login-header {
+  text-align: center;
+  margin-bottom: 2rem;
+}
+
+.logo-icon {
+  color: var(--primary-accent);
+  margin-bottom: 1rem;
+  filter: drop-shadow(0 0 12px var(--glow-color));
+}
+
+.login-header h1 {
+  font-size: 1.8rem;
+  font-weight: 700;
+  margin-bottom: 0.5rem;
+  letter-spacing: 2px;
+}
+
+.login-header p {
+  color: var(--text-tertiary);
+  font-size: 0.9rem;
+}
+
+.mb-6 { margin-bottom: 1.5rem; }
+.mb-4 { margin-bottom: 1rem; }
+.mt-4 { margin-top: 1rem; }
+.w-full { width: 100%; }
+.flex-between { display: flex; justify-content: space-between; align-items: center; }
+
+.switch-link {
+  text-align: center;
+  margin-top: 2rem;
+  font-size: 0.9rem;
+  color: var(--text-secondary);
+}
+
+/* 动效背景 */
+.particles-bg {
+  position: absolute;
+  inset: 0;
+}
+
+.particle {
+  position: absolute;
+  bottom: -10px;
+  width: 2px;
+  height: 2px;
+  background: var(--primary-accent);
+  border-radius: 50%;
+  opacity: 0;
+  animation: rise linear infinite;
+}
+
+@keyframes rise {
+  0% { transform: translateY(0) scale(1); opacity: 0; }
+  50% { opacity: 0.6; }
+  100% { transform: translateY(-100vh) scale(1.5); opacity: 0; }
+}
+
+.glow-orb {
+  position: absolute;
+  width: 400px;
+  height: 400px;
+  border-radius: 50%;
+  filter: blur(100px);
+  opacity: 0.15;
+  z-index: 1;
+}
+
+.glow-1 { top: -10%; right: -5%; background: var(--primary-accent); }
+.glow-2 { bottom: -10%; left: -5%; background: var(--secondary-accent); }
+</style>
 
 <script>
 import { ref, reactive } from 'vue'

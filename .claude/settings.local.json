@@ -15,7 +15,8 @@
       "Bash(mysql:*)",
       "Bash(timeout:*)",
       "Bash(dir:*)",
-      "Bash(tasklist:*)"
+      "Bash(tasklist:*)",
+      "Bash(mvn clean package:*)"
     ]
   }
 }
