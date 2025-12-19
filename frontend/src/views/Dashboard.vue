@@ -39,8 +39,6 @@
             </div>
           </el-card>
         </div>
-        
-        <el-avatar :size="42" src="https://i.pravatar.cc/40?u=admin" border />
       </div>
     </el-header>
 

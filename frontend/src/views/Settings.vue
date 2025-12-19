@@ -80,21 +80,21 @@
       <!-- 系统关于 -->
       <el-tab-pane>
         <template #label>
-          <span class="tab-label"><el-icon><InfoFilled /></el-icon> 关于量融</span>
+          <span class="tab-label"><el-icon><InfoFilled /></el-icon> 关于 InvestIQ AI</span>
         </template>
         
         <div class="about-section text-center p-12">
           <el-icon :size="60" color="var(--primary-accent)"><TrendCharts /></el-icon>
-          <h2 class="mt-4">量融智能投研系统</h2>
+          <h2 class="mt-4">InvestIQ AI 智能投研系统</h2>
           <p class="text-secondary mb-8">Version 1.2.0-PRO (Build 20251219)</p>
           
           <el-descriptions class="mt-12" :column="1" border style="max-width: 400px; margin: 0 auto;">
             <el-descriptions-item label="核心内核">Spring Boot 3.x / Vue 3.x</el-descriptions-item>
             <el-descriptions-item label="AI 引擎">DeepSeek-V3 / GPT-4o-Turbo</el-descriptions-item>
-            <el-descriptions-item label="开发团队">LiangRong Pro Team</el-descriptions-item>
+            <el-descriptions-item label="开发团队">InvestIQ AI Pro Team</el-descriptions-item>
           </el-descriptions>
           
-          <p class="mt-12 text-tertiary">© 2025 量融科技. All rights reserved.</p>
+          <p class="mt-12 text-tertiary">© 2025 InvestIQ AI. All rights reserved.</p>
         </div>
       </el-tab-pane>
     </el-tabs>
