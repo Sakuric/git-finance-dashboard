@@ -224,6 +224,7 @@ const savePreferences = async () => {
     await savePreference({
       userId: uid,
       riskToleranceLevel: preferences.value.risk,
+      investmentHorizonType: 'preset',
       investmentHorizonPreset: preferences.value.term,
       preferredIndustry: preferences.value.industries.join(',')
     })

@@ -19,16 +19,12 @@
       <el-aside width="220px" class="platform-aside">
         <div class="aside-title">模型平台</div>
         <el-menu :default-active="selectedPlatform" class="platform-menu" @select="selectPlatform">
-          <el-menu-item v-for="p in platforms" :key="p.id" :index="p.id">
+          <el-menu-item v-for="p in platforms" :key="p.id" :index="String(p.id)">
             <el-icon><component :is="p.id === 'openai' ? Connection : Cpu" /></el-icon>
-            <template #title>
-              <div class="flex-between w-full">
-                <span>{{ p.name }}</span>
-                <el-icon v-if="p.isCustom" class="delete-icon" @click.stop="removePlatform(p)">
-                  <component :is="Close" />
-                </el-icon>
-              </div>
-            </template>
+            <span>{{ p.name }}</span>
+            <el-icon v-if="p.isCustom" class="delete-icon" @click.stop="removePlatform(p)">
+              <component :is="Close" />
+            </el-icon>
           </el-menu-item>
         </el-menu>
       </el-aside>
@@ -153,13 +149,16 @@
 
 <script setup>
 import { ref, reactive, computed, onMounted } from 'vue'
-import { 
-  Connection, Cpu, Key, List, Plus, Search, 
-  Close, Delete, Star, StarFilled, CircleCheck, CircleCheckFilled 
+import {
+  Connection, Cpu, Key, List, Plus, Search,
+  Close, Delete, Star, StarFilled, CircleCheck, CircleCheckFilled
 } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { getAiPlatforms, saveAiPlatform, deleteAiPlatform } from '@/api/aiPlatform'
 import { getAiModels, addAiModel, updateAiModel, deleteAiModel, testApiKey as testApiKeyRequest } from '@/api/aiModel'
+import { useAuthStore } from '@/stores/auth'
+
+const authStore = useAuthStore()
 
 const isEnabled = ref(true)
 const apiKey = ref('')
@@ -171,36 +170,56 @@ const selectedPlatform = ref('openai')
 const selectedModel = ref(null)
 const customPlatformName = ref('')
 
-const platforms = ref([
-  { id: 'openai', name: 'OpenAI', apiUrl: 'https://api.openai.com/v1/' },
-  { id: 'google', name: 'Google AI', apiUrl: 'https://generativelanguage.googleapis.com/v1/' },
-  { id: 'anthropic', name: 'Anthropic', apiUrl: 'https://api.anthropic.com/v1/' },
-  { id: 'local', name: 'Local Ollama', apiUrl: 'http://localhost:11434/v1/' },
-  { id: 'custom', name: '自定义平台', apiUrl: '' }
-])
+const defaultPlatforms = [
+  { id: 'openai', name: 'OpenAI', apiUrl: 'https://api.openai.com/v1/', isDefault: true },
+  { id: 'google', name: 'Google AI', apiUrl: 'https://generativelanguage.googleapis.com/v1/', isDefault: true },
+  { id: 'anthropic', name: 'Anthropic', apiUrl: 'https://api.anthropic.com/v1/', isDefault: true },
+  { id: 'local', name: 'Local Ollama', apiUrl: 'http://localhost:11434/v1/', isDefault: true }
+]
 
+const platforms = ref([...defaultPlatforms])
 const modelGroups = ref([])
 
 const loadData = async () => {
-  const uid = localStorage.getItem('userId') || 1
-  const [pRes, mRes] = await Promise.all([getAiPlatforms(uid), getAiModels(uid)])
-  
-  if (pRes.data) {
-    const customs = pRes.data.map(p => ({ id: p.platformKey, name: p.platformName, isCustom: true, dbId: p.id, ...p }))
-    platforms.value = [...platforms.value.filter(x => !x.isCustom), ...customs]
-  }
+  const uid = authStore.userId || localStorage.getItem('userId')
+  if (!uid) return
+
+  const mRes = await getAiModels(uid)
 
   if (mRes.data) {
     const groups = {}
+    const customPlatforms = new Set()
+
     mRes.data.forEach(m => {
       if (!groups[m.modelProvider]) groups[m.modelProvider] = { name: m.modelProvider, models: [] }
       groups[m.modelProvider].models.push({
         id: m.id, name: m.modelName, dbData: m,
         badges: (m.modelType || '').split(',').filter(Boolean).map(t => ({ type: t, label: t === 'vision' ? '视觉' : t === 'web' ? '联网' : '推理' }))
       })
+
+      // 收集自定义平台
+      const isDefaultPlatform = defaultPlatforms.some(p => p.id === m.modelProvider.toLowerCase())
+      if (!isDefaultPlatform) {
+        customPlatforms.add(m.modelProvider)
+      }
     })
+
     modelGroups.value = Object.values(groups)
     expandedGroups.value = modelGroups.value.map(g => g.name)
+
+    // 动态更新平台列表
+    const newPlatforms = [...defaultPlatforms]
+    customPlatforms.forEach(provider => {
+      const firstModel = mRes.data.find(m => m.modelProvider === provider)
+      newPlatforms.push({
+        id: provider.toLowerCase(),
+        name: provider,
+        apiUrl: firstModel?.apiEndpoint || '',
+        apiKey: firstModel?.apiKey || '',
+        isCustom: true
+      })
+    })
+    platforms.value = newPlatforms
   }
 }
 
@@ -210,6 +229,9 @@ const selectPlatform = (id) => {
   if (p) {
     apiUrl.value = p.apiUrl || ''
     apiKey.value = p.apiKey || ''
+    if (p.isCustom) {
+      customPlatformName.value = p.name
+    }
   }
 }
 
@@ -239,7 +261,7 @@ const clearSelectedModel = () => selectedModel.value = null
 
 const newModel = reactive({ group: '', name: '', badges: [] })
 const addModel = async () => {
-  const uid = localStorage.getItem('userId') || 1
+  const uid = authStore.userId || localStorage.getItem('userId')
   await addAiModel({
     userId: uid, modelName: newModel.name, modelProvider: newModel.group,
     apiKey: apiKey.value, apiEndpoint: apiUrl.value, modelType: newModel.badges.join(','),
@@ -257,15 +279,25 @@ const removeModel = async (m) => {
 }
 
 const setDefaultModel = async (m) => {
-  await updateAiModel(m.id, { ...m.dbData, isDefault: 1 })
+  const uid = authStore.userId || localStorage.getItem('userId')
+  await updateAiModel(m.id, {
+    userId: uid,
+    modelName: m.dbData.modelName,
+    modelProvider: m.dbData.modelProvider,
+    apiKey: m.dbData.apiKey,
+    apiEndpoint: m.dbData.apiEndpoint,
+    modelType: m.dbData.modelType,
+    isDefault: 1,
+    maxTokens: m.dbData.maxTokens,
+    temperature: m.dbData.temperature
+  })
   ElMessage.success('已设为默认模型')
   loadData()
 }
 
 const removePlatform = async (p) => {
   await ElMessageBox.confirm(`确定移除平台 ${p.name} 吗？`, '警告')
-  await deleteAiPlatform(p.dbId)
-  loadData()
+  ElMessage.info('平台功能暂未实现')
 }
 
 onMounted(() => loadData())

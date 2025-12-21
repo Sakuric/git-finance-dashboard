@@ -27,12 +27,15 @@ public class InvestmentPreferenceController {
 
     @PostMapping
     public Result<String> savePreference(@RequestBody PreferenceRequest request) {
+        System.out.println("收到偏好保存请求，userId: " + request.getUserId());
+
         if (request.getUserId() == null) {
             return Result.error(400, "用户未登录或会话已失效，请重新登录");
         }
 
         if (userMapper.findById(request.getUserId()) == null) {
-            return Result.error(404, "用户不存在，请重新登录后重试");
+            System.out.println("用户不存在，userId: " + request.getUserId());
+            return Result.error(400, "用户不存在或未登录，请重新登录后再试");
         }
 
         InvestmentPreference preference = new InvestmentPreference();
@@ -51,11 +54,13 @@ public class InvestmentPreferenceController {
         preference.setMaxAcceptableLoss(request.getMaxAcceptableLoss());
 
         try {
+            System.out.println("准备保存偏好，数据: " + preference);
             preferenceService.saveOrUpdate(preference);
+            System.out.println("偏好保存成功");
             return Result.success("保存成功");
-        } catch (DataIntegrityViolationException ex) {
-            return Result.error(400, "用户不存在或未登录，请重新登录后再试");
         } catch (Exception ex) {
+            System.out.println("保存失败，异常: " + ex.getClass().getName() + ", 消息: " + ex.getMessage());
+            ex.printStackTrace();
             return Result.error(500, "保存失败：" + ex.getMessage());
         }
     }
