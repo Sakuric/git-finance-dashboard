@@ -16,6 +16,8 @@ public interface StockInfoMapper {
 
     StockInfo findByStockCode(@Param("stockCode")String stockCode);
 
+    StockInfo findById(@Param("id") Long id);
+
     int insert(StockInfo stockInfo);
     int batchInsert(@Param("stockInfos") List<StockInfo> stockInfos);
     int batchInsertOrUpdate(@Param("stockInfos") List<StockInfo> stockInfos);
@@ -26,7 +28,7 @@ public interface StockInfoMapper {
      * 获取所有股票代码
      */
     List<String> getAllStockCodes();
-    
+
     /**
      * 根据股票代码获取ID
      */

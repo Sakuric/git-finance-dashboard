@@ -66,6 +66,10 @@ public class AdvancedBacktestService {
         response.setOverfitting(overfitting);
         response.setEquityCurve(equityCurve);
 
+        // AI分析
+        String aiAnalysis = generateAIAnalysis(trainResult, testResult, overfitting, request);
+        response.setAiAnalysis(aiAnalysis);
+
         return response;
     }
 
@@ -97,8 +101,8 @@ public class AdvancedBacktestService {
                 if (positions.containsKey(advice.getStockCode())) {
                     Position pos = positions.get(advice.getStockCode());
 
-                    // 止损：价格下跌超过10%
-                    BigDecimal stopLossThreshold = pos.buyPrice.multiply(new BigDecimal("0.90"));
+                    // 止损：价格下跌超过5%
+                    BigDecimal stopLossThreshold = pos.buyPrice.multiply(new BigDecimal("0.95"));
                     if (todayData.getLowPrice().compareTo(stopLossThreshold) <= 0) {
                         BigDecimal sellPrice = stopLossThreshold;
                         cash = cash.add(sellPrice.multiply(new BigDecimal(pos.shares)));
@@ -107,9 +111,9 @@ public class AdvancedBacktestService {
                         log.info("止损卖出: {} 股票={}, 买入价={}, 卖出价={}", date, advice.getStockCode(), pos.buyPrice, sellPrice);
                         positions.remove(advice.getStockCode());
                     }
-                    // 止盈：价格上涨超过20%
-                    else if (todayData.getHighPrice().compareTo(pos.buyPrice.multiply(new BigDecimal("1.20"))) >= 0) {
-                        BigDecimal sellPrice = pos.buyPrice.multiply(new BigDecimal("1.20"));
+                    // 止盈：价格上涨超过10%
+                    else if (todayData.getHighPrice().compareTo(pos.buyPrice.multiply(new BigDecimal("1.10"))) >= 0) {
+                        BigDecimal sellPrice = pos.buyPrice.multiply(new BigDecimal("1.10"));
                         cash = cash.add(sellPrice.multiply(new BigDecimal(pos.shares)));
                         winCount++;
                         log.info("止盈卖出: {} 股票={}, 买入价={}, 卖出价={}", date, advice.getStockCode(), pos.buyPrice, sellPrice);
@@ -259,6 +263,41 @@ public class AdvancedBacktestService {
 
         if (volatility.compareTo(BigDecimal.ZERO) == 0) return BigDecimal.ZERO;
         return mean.subtract(new BigDecimal("0.025")).divide(volatility, 2, RoundingMode.HALF_UP);
+    }
+
+    private String generateAIAnalysis(BacktestResponseDTO.PeriodResult train, BacktestResponseDTO.PeriodResult test,
+                                      BacktestResponseDTO.OverfittingDetection overfitting, BacktestRequestDTO request) {
+        StringBuilder analysis = new StringBuilder();
+        analysis.append("<p><strong>策略整体表现：</strong></p>");
+
+        if (train.getTotalReturn().compareTo(BigDecimal.ZERO) > 0 && test.getTotalReturn().compareTo(BigDecimal.ZERO) > 0) {
+            analysis.append("<p>✅ 训练期和测试期均实现正收益，策略表现良好。</p>");
+        } else {
+            analysis.append("<p>⚠️ 策略在部分时期出现亏损，需要优化。</p>");
+        }
+
+        analysis.append("<p><strong>风险收益比分析：</strong></p>");
+        if (train.getSharpeRatio().compareTo(new BigDecimal("1")) > 0) {
+            analysis.append("<p>✅ 夏普比率大于1，风险收益比合理。</p>");
+        } else {
+            analysis.append("<p>⚠️ 夏普比率偏低，风险相对收益较高。</p>");
+        }
+
+        analysis.append("<p><strong>过拟合风险：</strong></p>");
+        if (overfitting.getIsOverfitted()) {
+            analysis.append("<p>❌ 检测到过拟合风险，测试期表现显著低于训练期。</p>");
+        } else {
+            analysis.append("<p>✅ 未检测到明显过拟合，策略稳定性良好。</p>");
+        }
+
+        analysis.append("<p><strong>实盘建议：</strong></p>");
+        if (!overfitting.getIsOverfitted() && test.getTotalReturn().compareTo(BigDecimal.ZERO) > 0) {
+            analysis.append("<p>✅ 策略表现稳定，可以考虑小仓位实盘测试。</p>");
+        } else {
+            analysis.append("<p>⚠️ 建议进一步优化策略参数后再考虑实盘应用。</p>");
+        }
+
+        return analysis.toString();
     }
 
     private static class Position {

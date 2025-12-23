@@ -12,6 +12,7 @@ public class BacktestResponseDTO {
     private OverfittingDetection overfitting;
     private List<TradeDetail> trades;
     private List<EquityPoint> equityCurve;
+    private String aiAnalysis;
 
     @Data
     public static class PeriodResult {

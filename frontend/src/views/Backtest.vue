@@ -19,8 +19,22 @@
         <el-card shadow="never" class="h-full">
           <template #header><span><el-icon class="mr-1"><Tools /></el-icon>回测参数配置</span></template>
           <el-form :model="form" label-position="top">
-            <el-form-item label="关联投资建议 ID">
-              <el-input-number v-model="form.adviceId" :min="1" class="w-full" controls-position="right" placeholder="输入 ID" />
+            <el-form-item label="关联投资建议">
+              <el-select v-model="form.adviceId" placeholder="请选择投资建议" class="w-full" filterable>
+                <el-option
+                  v-for="advice in adviceList"
+                  :key="advice.id"
+                  :label="`#${advice.id} - ${advice.title || '投资建议'}`"
+                  :value="advice.id"
+                >
+                  <div style="display: flex; justify-content: space-between;">
+                    <span>{{ advice.title || '投资建议' }}</span>
+                    <span style="color: var(--el-text-color-secondary); font-size: 12px;">
+                      {{ advice.createdAt ? new Date(advice.createdAt).toLocaleDateString() : '' }}
+                    </span>
+                  </div>
+                </el-option>
+              </el-select>
             </el-form-item>
             
             <el-form-item label="初始模拟资金 (CNY)">
@@ -38,6 +52,26 @@
                 value-format="YYYY-MM-DD"
               />
             </el-form-item>
+
+            <el-form-item label="回测策略">
+              <el-select v-model="form.strategy" class="w-full" @change="onStrategyChange">
+                <el-option label="系统默认策略" value="default" />
+                <el-option label="自定义策略" value="custom" />
+              </el-select>
+              <div class="strategy-tip" v-if="form.strategy === 'default'">
+                <el-icon><InfoFilled /></el-icon>
+                <span>止盈: +10% | 止损: -5% | 仓位: 10%</span>
+              </div>
+            </el-form-item>
+
+            <template v-if="form.strategy === 'custom'">
+              <el-form-item label="止盈阈值 (%)">
+                <el-input-number v-model="form.takeProfitPct" :min="5" :max="50" :step="5" class="w-full" controls-position="right" />
+              </el-form-item>
+              <el-form-item label="止损阈值 (%)">
+                <el-input-number v-model="form.stopLossPct" :min="3" :max="20" :step="1" class="w-full" controls-position="right" />
+              </el-form-item>
+            </template>
 
             <el-form-item label="验证模式">
               <el-select v-model="form.splitMethod" class="w-full">
@@ -105,6 +139,12 @@
             <div id="backtestChart" style="height: 380px;"></div>
           </el-card>
 
+          <!-- AI分析结果 -->
+          <el-card shadow="never" v-if="result && result.aiAnalysis" class="ai-analysis-card">
+            <template #header><span><el-icon class="mr-1"><ChatDotRound /></el-icon>AI智能分析</span></template>
+            <div class="ai-analysis-content" v-html="result.aiAnalysis"></div>
+          </el-card>
+
           <!-- 策略说明 -->
           <el-card shadow="never" class="strategy-desc-card">
             <template #header><span>策略逻辑概览</span></template>
@@ -122,22 +162,46 @@
 </template>
 
 <script setup>
-import { ref, computed, nextTick } from 'vue'
+import { ref, computed, nextTick, onMounted } from 'vue'
 import * as echarts from 'echarts'
-import { VideoPlay, Tools, Histogram, Aim, TrendCharts } from '@element-plus/icons-vue'
+import { VideoPlay, Tools, Histogram, Aim, TrendCharts, InfoFilled, ChatDotRound } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import { backtestApi } from '@/api/backtest'
+import { adviceApi } from '@/api/advice'
 
 const loading = ref(false)
 const result = ref(null)
 const dateRange = ref(['2023-01-01', '2024-12-31'])
+const adviceList = ref([])
 let chart = null
 
 const form = ref({
   adviceId: null,
   initialCapital: 100000,
   splitMethod: 'train-test',
-  trainRatio: 0.7
+  trainRatio: 0.7,
+  strategy: 'default',
+  takeProfitPct: 10,
+  stopLossPct: 5
+})
+
+const onStrategyChange = () => {
+  if (form.value.strategy === 'default') {
+    form.value.takeProfitPct = 10
+    form.value.stopLossPct = 5
+  }
+}
+
+onMounted(async () => {
+  const userId = localStorage.getItem('userId') || 1
+  try {
+    const res = await adviceApi.getAdviceList(userId)
+    if (res.code === 200) {
+      adviceList.value = res.data || []
+    }
+  } catch (e) {
+    console.error('获取投资建议列表失败', e)
+  }
 })
 
 const trainStats = computed(() => {
@@ -167,7 +231,7 @@ const testStats = computed(() => {
 })
 
 const runBacktest = async () => {
-  if (!form.value.adviceId) return ElMessage.warning('请输入需要回测的建议 ID')
+  if (!form.value.adviceId) return ElMessage.warning('请选择需要回测的投资建议')
   
   loading.value = true
   try {
@@ -215,6 +279,31 @@ const initChart = (data) => {
 </script>
 
 <style scoped>
+.strategy-tip {
+  margin-top: 8px;
+  padding: 8px 12px;
+  background: rgba(0, 166, 255, 0.1);
+  border-radius: 6px;
+  font-size: 12px;
+  color: #00A6FF;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.ai-analysis-card {
+  background: linear-gradient(135deg, rgba(57, 211, 83, 0.05), transparent);
+  border-color: rgba(57, 211, 83, 0.3) !important;
+}
+.ai-analysis-content {
+  line-height: 1.8;
+  color: var(--text-primary);
+}
+.ai-analysis-content :deep(p) {
+  margin: 0.5rem 0;
+}
+.ai-analysis-content :deep(strong) {
+  color: #39D353;
+}
 .empty-backtest { padding: 10rem 0; background: rgba(255,255,255,0.01); border: 1px dashed var(--border-color); border-radius: 12px; }
 .result-stats-card { background: rgba(255,255,255,0.02); }
 .highlight-card { border-color: rgba(0, 166, 255, 0.3) !important; background: linear-gradient(135deg, rgba(0, 166, 255, 0.05), transparent); }

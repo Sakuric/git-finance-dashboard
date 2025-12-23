@@ -1,5 +1,7 @@
 package com.example.financedashboard.service.impl;
 
+import com.example.financedashboard.dto.UserFavoriteDTO;
+import com.example.financedashboard.entity.StockInfo;
 import com.example.financedashboard.entity.UserFavorite;
 import com.example.financedashboard.mapper.StockInfoMapper;
 import com.example.financedashboard.mapper.UserFavoriteMapper;
@@ -7,6 +9,7 @@ import com.example.financedashboard.service.UserFavoriteService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
+import java.util.ArrayList;
 import java.util.List;
 
 @Service
@@ -38,6 +41,32 @@ public class UserFavoriteServiceImpl implements UserFavoriteService {
     @Override
     public List<UserFavorite> getUserFavorites(Long userId) {
         return userFavoriteMapper.findByUserId(userId);
+    }
+
+    @Override
+    public List<UserFavoriteDTO> getUserFavoritesWithDetails(Long userId) {
+        List<UserFavorite> favorites = userFavoriteMapper.findByUserId(userId);
+        List<UserFavoriteDTO> result = new ArrayList<>();
+
+        for (UserFavorite favorite : favorites) {
+            StockInfo stock = stockInfoMapper.findById(favorite.getStockId());
+            if (stock != null) {
+                UserFavoriteDTO dto = new UserFavoriteDTO();
+                dto.setId(favorite.getId());
+                dto.setUserId(favorite.getUserId());
+                dto.setStockCode(stock.getStockCode());
+                dto.setStockName(stock.getStockName());
+                dto.setExchange(stock.getExchange());
+                dto.setIndustry(stock.getIndustry());
+                dto.setCurrentPrice(stock.getCurrentPrice());
+                dto.setChangePercent(stock.getChangePercent());
+                dto.setRemark(favorite.getRemark());
+                dto.setCreatedAt(favorite.getCreatedAt());
+                result.add(dto);
+            }
+        }
+
+        return result;
     }
 
     @Override

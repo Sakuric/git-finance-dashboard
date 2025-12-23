@@ -102,80 +102,7 @@ public class MarketIndexServiceImpl implements MarketIndexService {
             return cachedOverview;
         }
 
-        Map<String, Object> overview = new HashMap<>();
-
-        try {
-            List<StockInfo> allStocks = stockInfoMapper.findAll();
-
-            if (allStocks.isEmpty()) {
-                log.warn("数据库无股票数据，尝试从新浪API获取实时数据");
-                return fetchRealtimeMarketOverview();
-            }
-
-            int upCount = 0;
-            int downCount = 0;
-            int limitUpCount = 0;
-            int limitDownCount = 0;
-            BigDecimal totalAmount = BigDecimal.ZERO;
-
-            for (StockInfo stock : allStocks) {
-                if (stock.getChangePercent() != null) {
-                    BigDecimal change = stock.getChangePercent();
-
-                    if (change.compareTo(BigDecimal.ZERO) > 0) {
-                        upCount++;
-                        if (change.compareTo(new BigDecimal("9.9")) >= 0) {
-                            limitUpCount++;
-                        }
-                    } else if (change.compareTo(BigDecimal.ZERO) < 0) {
-                        downCount++;
-                        if (change.compareTo(new BigDecimal("-9.9")) <= 0) {
-                            limitDownCount++;
-                        }
-                    }
-                }
-            }
-
-            java.time.LocalDate today = java.time.LocalDate.now();
-            List<StockHistory> todayHistory = stockHistoryMapper.findByTradeDate(today);
-
-            if (todayHistory.isEmpty()) {
-                for (int i = 1; i <= 7; i++) {
-                    todayHistory = stockHistoryMapper.findByTradeDate(today.minusDays(i));
-                    if (!todayHistory.isEmpty()) break;
-                }
-            }
-
-            for (StockHistory history : todayHistory) {
-                if (history.getAmount() != null) {
-                    totalAmount = totalAmount.add(history.getAmount());
-                }
-            }
-
-            overview.put("totalCount", allStocks.size());
-            overview.put("upCount", upCount);
-            overview.put("downCount", downCount);
-            overview.put("limitUpCount", limitUpCount);
-            overview.put("limitDownCount", limitDownCount);
-            overview.put("totalVolume", formatVolume(totalAmount));
-            overview.put("turnoverRate", "--");
-            overview.put("updateTime", new Date());
-
-            cachedOverview = overview;
-            lastSyncTime = currentTime;
-
-        } catch (Exception e) {
-            log.error("获取市场概况失败", e);
-            overview.put("upCount", "--");
-            overview.put("downCount", "--");
-            overview.put("limitUpCount", "--");
-            overview.put("limitDownCount", "--");
-            overview.put("totalVolume", "--");
-            overview.put("turnoverRate", "--");
-            overview.put("updateTime", new Date());
-        }
-
-        return overview;
+        return fetchRealtimeMarketOverview();
     }
 
     private Map<String, Object> fetchRealtimeMarketOverview() {
@@ -190,14 +117,23 @@ public class MarketIndexServiceImpl implements MarketIndexService {
 
             int upCount = 0;
             int downCount = 0;
+            int limitUpCount = 0;
+            int limitDownCount = 0;
             BigDecimal totalAmount = BigDecimal.ZERO;
 
             for (SinaRealtimeDTO stock : realtimeData) {
                 if (stock.getChangePercent() != null) {
-                    if (stock.getChangePercent().compareTo(BigDecimal.ZERO) > 0) {
+                    BigDecimal change = stock.getChangePercent();
+                    if (change.compareTo(BigDecimal.ZERO) > 0) {
                         upCount++;
-                    } else if (stock.getChangePercent().compareTo(BigDecimal.ZERO) < 0) {
+                        if (change.compareTo(new BigDecimal("9.9")) >= 0) {
+                            limitUpCount++;
+                        }
+                    } else if (change.compareTo(BigDecimal.ZERO) < 0) {
                         downCount++;
+                        if (change.compareTo(new BigDecimal("-9.9")) <= 0) {
+                            limitDownCount++;
+                        }
                     }
                 }
                 if (stock.getAmount() != null) {
@@ -208,8 +144,8 @@ public class MarketIndexServiceImpl implements MarketIndexService {
             int ratio = realtimeData.isEmpty() ? 1 : 500;
             overview.put("upCount", upCount * ratio);
             overview.put("downCount", downCount * ratio);
-            overview.put("limitUpCount", 0);
-            overview.put("limitDownCount", 0);
+            overview.put("limitUpCount", limitUpCount * ratio);
+            overview.put("limitDownCount", limitDownCount * ratio);
             overview.put("totalVolume", formatVolume(totalAmount.multiply(BigDecimal.valueOf(ratio))));
             overview.put("turnoverRate", "--");
             overview.put("updateTime", new Date());

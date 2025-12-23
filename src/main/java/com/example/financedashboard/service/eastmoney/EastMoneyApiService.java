@@ -95,4 +95,23 @@ public class EastMoneyApiService {
         }
         return "0." + code;
     }
+
+    public String fetchMarketOverview() {
+        String url = "https://push2.eastmoney.com/api/qt/ulist.np/get?fltt=2&invt=2&fields=f2,f3,f12,f13,f14&secids=1.000001,0.399001,0.399006&ut=fa5fd1943c7b386f172d6893dbfba10b";
+
+        Request request = new Request.Builder()
+            .url(url)
+            .addHeader("User-Agent", "Mozilla/5.0")
+            .addHeader("Referer", "https://quote.eastmoney.com/")
+            .build();
+
+        try (Response response = okHttpClient.newCall(request).execute()) {
+            if (response.isSuccessful() && response.body() != null) {
+                return response.body().string();
+            }
+        } catch (Exception e) {
+            log.error("获取市场概览失败", e);
+        }
+        return null;
+    }
 }

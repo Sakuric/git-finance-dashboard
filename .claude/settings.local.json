@@ -16,7 +16,8 @@
       "Bash(timeout:*)",
       "Bash(dir:*)",
       "Bash(tasklist:*)",
-      "Bash(mvn clean package:*)"
+      "Bash(mvn clean package:*)",
+      "Bash(npm run build:*)"
     ]
   }
 }

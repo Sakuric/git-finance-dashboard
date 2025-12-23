@@ -29,6 +29,10 @@
         SELECT * FROM stock_info WHERE stock_code = #{stockCode}
     </select>
 
+    <select id="findById" resultMap="BaseResultMap">
+        SELECT * FROM stock_info WHERE id = #{id}
+    </select>
+
     <insert id="insert" parameterType="com.example.financedashboard.entity.StockInfo" useGeneratedKeys="true" keyProperty="id">
         INSERT INTO stock_info (stock_code, stock_name, exchange, industry, sector,
                                 listing_date, current_price, yesterday_close, change_percent,

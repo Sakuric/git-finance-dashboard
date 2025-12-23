@@ -98,3 +98,11 @@ export function getEastMoneyQuote(stockCode) {
     method: 'get'
   })
 }
+
+export function getLatestAdvice(userId) {
+  return request({
+    url: '/advice/latest',
+    method: 'get',
+    params: { userId }
+  })
+}

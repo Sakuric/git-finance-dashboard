@@ -1,6 +1,6 @@
 package com.example.financedashboard.controller;
 
-import com.example.financedashboard.entity.UserFavorite;
+import com.example.financedashboard.dto.UserFavoriteDTO;
 import com.example.financedashboard.service.UserFavoriteService;
 import com.example.financedashboard.utils.Result;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -31,8 +31,8 @@ public class UserFavoriteController {
     }
 
     @GetMapping("/list")
-    public Result<List<UserFavorite>> getUserFavorites(@RequestParam(name = "user_id") Long userId) {
-        List<UserFavorite> favorites = userFavoriteService.getUserFavorites(userId);
+    public Result<List<UserFavoriteDTO>> getUserFavorites(@RequestParam(name = "user_id") Long userId) {
+        List<UserFavoriteDTO> favorites = userFavoriteService.getUserFavoritesWithDetails(userId);
         return Result.success(favorites);
     }
 
