@@ -225,10 +225,10 @@ const watchlistStocks = ref([])
 const aiAdvice = ref({ content: '', time: '', loading: false })
 const aiExpanded = ref(false)
 
-// 图表颜色方案
+// 图表颜色方案 - A股标准：红涨绿跌
 const chartColors = {
-  up: '#39D353',
-  down: '#F85149',
+  up: '#FF4D4F',    // 涨：红色
+  down: '#52C41A',  // 跌：绿色
   ma5: '#FF6B6B',
   ma10: '#4ECDC4',
   ma20: '#45B7D1',
@@ -290,10 +290,10 @@ const initMiniCharts = async () => {
         data: historyData,
         smooth: true,
         symbol: 'none',
-        lineStyle: { width: 2, color: isPositive ? '#00B894' : '#D63031' },
+        lineStyle: { width: 2, color: isPositive ? '#FF4D4F' : '#52C41A' },
         areaStyle: {
           color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
-            { offset: 0, color: isPositive ? 'rgba(0, 184, 148, 0.3)' : 'rgba(214, 48, 49, 0.3)' },
+            { offset: 0, color: isPositive ? 'rgba(255, 77, 79, 0.3)' : 'rgba(82, 196, 26, 0.3)' },
             { offset: 1, color: 'transparent' }
           ])
         }
@@ -392,7 +392,7 @@ const initTimelineChart = async () => {
             let res = params[0].axisValue + '<br/>'
             params.forEach(item => {
               if (item.seriesName === '价格') {
-                const color = item.data >= yesterdayClose ? '#00B894' : '#D63031'
+                const color = item.data >= yesterdayClose ? '#FF4D4F' : '#52C41A'
                 const change = (item.data - yesterdayClose).toFixed(2)
                 const percent = ((change / yesterdayClose) * 100).toFixed(2)
                 res += `<span style="color:${color}">${item.marker}${item.seriesName}: ${item.data} (${change >= 0 ? '+' : ''}${percent}%)</span><br/>`
@@ -424,7 +424,7 @@ const initTimelineChart = async () => {
         ],
         visualMap: {
           show: false,
-          pieces: [{ gt: 0, lte: yesterdayClose, color: '#D63031' }, { gt: yesterdayClose, color: '#00B894' }],
+          pieces: [{ gt: 0, lte: yesterdayClose, color: '#52C41A' }, { gt: yesterdayClose, color: '#FF4D4F' }],
           outOfRange: { color: '#8B949E' },
           seriesIndex: 0
         },
@@ -444,7 +444,7 @@ const initTimelineChart = async () => {
             } 
           },
           { name: '均价', type: 'line', data: avgPrices, smooth: true, symbol: 'none', lineStyle: { width: 1, color: '#FFA500', type: 'dashed' } },
-          { name: '成交量', type: 'bar', data: volumes, xAxisIndex: 1, yAxisIndex: 1, itemStyle: { color: (params) => prices[params.dataIndex] >= yesterdayClose ? '#00B894' : '#D63031' } }
+          { name: '成交量', type: 'bar', data: volumes, xAxisIndex: 1, yAxisIndex: 1, itemStyle: { color: (params) => prices[params.dataIndex] >= yesterdayClose ? '#FF4D4F' : '#52C41A' } }
         ]
       })
     }
@@ -472,7 +472,7 @@ const initKLineChart = async () => {
 
       const dates = rawData.map(item => item.time)
       const kData = rawData.map(item => item.k)
-      const volumes = rawData.map(item => ({ value: item.volume, itemStyle: { color: item.k[1] >= item.k[0] ? '#00B894' : '#D63031' } }))
+      const volumes = rawData.map(item => ({ value: item.volume, itemStyle: { color: item.k[1] >= item.k[0] ? '#FF4D4F' : '#52C41A' } }))
       
       const ma5 = calculateMA(kData, 5)
       const ma10 = calculateMA(kData, 10)
@@ -497,7 +497,7 @@ const initKLineChart = async () => {
         ],
         dataZoom: [{ type: 'inside', xAxisIndex: [0, 1], start: 80, end: 100 }, { show: true, xAxisIndex: [0, 1], type: 'slider', bottom: 10, start: 80, end: 100 }],
         series: [
-          { name: 'K线', type: 'candlestick', data: kData, itemStyle: { color: '#00B894', color0: '#D63031', borderColor: '#00B894', borderColor0: '#D63031' } },
+          { name: 'K线', type: 'candlestick', data: kData, itemStyle: { color: '#FF4D4F', color0: '#52C41A', borderColor: '#FF4D4F', borderColor0: '#52C41A' } },
           { name: 'MA5', type: 'line', data: ma5, smooth: true, symbol: 'none', lineStyle: { width: 1, color: chartColors.ma5 } },
           { name: 'MA10', type: 'line', data: ma10, smooth: true, symbol: 'none', lineStyle: { width: 1, color: chartColors.ma10 } },
           { name: 'MA20', type: 'line', data: ma20, smooth: true, symbol: 'none', lineStyle: { width: 1, color: chartColors.ma20 } },

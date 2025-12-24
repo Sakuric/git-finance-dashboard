@@ -14,8 +14,8 @@
     --text-primary: #F0F6FC;
     --text-secondary: #8B949E;
     --text-tertiary: #6E7681;
-    --color-positive: #39D353; /* 涨为绿 (国际标准/更清新) - 如果您坚持涨为红，我后面可以改 */
-    --color-negative: #F85149; /* 跌为红 */
+    --color-positive: #FF4D4F; /* A股标准：涨为红 */
+    --color-negative: #52C41A; /* A股标准：跌为绿 */
     --color-warning: #D29922;
     --color-info: #58A6FF;
     --font-family: 'Inter', 'Noto Sans SC', -apple-system, BlinkMacSystemFont, sans-serif;

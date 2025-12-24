@@ -136,8 +136,8 @@ const sellOrders = ref([])
 const buyOrders = ref([])
 const tickData = ref([])
 
-// 初始化图表颜色
-const colors = { up: '#39D353', down: '#F85149', primary: '#00A6FF' }
+// 初始化图表颜色 - A股标准：红涨绿跌
+const colors = { up: '#FF4D4F', down: '#52C41A', primary: '#00A6FF' }
 
 const loadStockData = async () => {
   try {
