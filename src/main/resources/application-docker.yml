@@ -1,0 +1,52 @@
+server:
+  port: 8081
+
+spring:
+  application:
+    name: finance-dashboard
+  datasource:
+    url: ${SPRING_DATASOURCE_URL}
+    username: ${SPRING_DATASOURCE_USERNAME}
+    password: ${SPRING_DATASOURCE_PASSWORD}
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    hikari:
+      auto-commit: true
+      connection-timeout: 30000
+      maximum-pool-size: 20
+      minimum-idle: 5
+
+mybatis:
+  mapper-locations: classpath:mapper/*.xml
+  configuration:
+    map-underscore-to-camel-case: true
+
+jwt:
+  secret: ${JWT_SECRET}
+  expiration: 604800
+
+sina:
+  api:
+    base-url: https://hq.sinajs.cn
+    timeout: 5000
+    retry-times: 3
+    batch-size: 50
+  scheduler:
+    enabled: true
+    realtime-cron: "0 */1 9-15 * * MON-FRI"
+    history-cron: "0 0 16 * * MON-FRI"
+
+llm:
+  provider: openai
+  api-key: ${LLM_API_KEY}
+  base-url: ${LLM_BASE_URL}
+  model: ${LLM_MODEL}
+  timeout: 60000
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
+  endpoint:
+    health:
+      show-details: always
