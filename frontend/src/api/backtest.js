@@ -14,5 +14,13 @@ export const backtestApi = {
       url: `/backtest/${adviceId}`,
       method: 'get'
     })
+  },
+
+  analyzeBacktest(data) {
+    return request({
+      url: '/backtest/analyze',
+      method: 'post',
+      data
+    })
   }
 }

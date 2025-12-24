@@ -7,6 +7,9 @@
         <p>多因子、多维度验证投资策略的稳健性</p>
       </div>
       <div class="header-right">
+        <el-button v-if="result" type="success" :icon="DataAnalysis" size="large" @click="showAnalysis">
+          数据分析
+        </el-button>
         <el-button type="primary" :icon="VideoPlay" size="large" :loading="loading" @click="runBacktest">
           {{ loading ? '深度回测中...' : '运行全量回测' }}
         </el-button>
@@ -41,15 +44,27 @@
               <el-input-number v-model="form.initialCapital" :step="10000" class="w-full" controls-position="right" />
             </el-form-item>
 
-            <el-form-item label="回测时间跨度">
+            <el-form-item label="回测起始日期">
               <el-date-picker
-                v-model="dateRange"
-                type="daterange"
-                range-separator="至"
-                start-placeholder="开始日期"
-                end-placeholder="结束日期"
+                v-model="startDate"
+                type="date"
+                placeholder="选择开始日期"
                 class="w-full"
+                format="YYYY-MM-DD"
                 value-format="YYYY-MM-DD"
+                :disabled-date="disabledDate"
+              />
+            </el-form-item>
+
+            <el-form-item label="回测终止日期">
+              <el-date-picker
+                v-model="endDate"
+                type="date"
+                placeholder="选择结束日期"
+                class="w-full"
+                format="YYYY-MM-DD"
+                value-format="YYYY-MM-DD"
+                :disabled-date="disabledDate"
               />
             </el-form-item>
 
@@ -150,30 +165,104 @@
             <template #header><span>策略逻辑概览</span></template>
             <el-descriptions :column="2" border>
               <el-descriptions-item label="入场时机">回测首日以 10% 初始头寸建仓</el-descriptions-item>
-              <el-descriptions-item label="动态止盈">价格上涨超过 20% 时触发全局平仓</el-descriptions-item>
-              <el-descriptions-item label="硬性止损">价格下跌超过 10% 时触发全局平仓</el-descriptions-item>
+              <el-descriptions-item label="动态止盈">价格上涨超过 {{ form.takeProfitPct }}% 时触发全局平仓</el-descriptions-item>
+              <el-descriptions-item label="硬性止损">价格下跌超过 {{ form.stopLossPct }}% 时触发全局平仓</el-descriptions-item>
               <el-descriptions-item label="验证机制">按 {{ (form.trainRatio * 100).toFixed(0) }}% 比例实施样本内/外交叉验证</el-descriptions-item>
             </el-descriptions>
           </el-card>
         </el-space>
       </el-col>
     </el-row>
+
+    <!-- 数据分析对话框 -->
+    <el-dialog v-model="analysisVisible" title="回测数据深度分析" width="90%" top="5vh">
+      <el-tabs v-model="activeTab">
+        <el-tab-pane label="收益分析" name="returns">
+          <el-row :gutter="20">
+            <el-col :span="12">
+              <div id="returnDistChart" style="height: 300px;"></div>
+            </el-col>
+            <el-col :span="12">
+              <div id="drawdownChart" style="height: 300px;"></div>
+            </el-col>
+          </el-row>
+        </el-tab-pane>
+
+        <el-tab-pane label="交易统计" name="trades">
+          <el-row :gutter="20">
+            <el-col :span="12">
+              <div id="tradeStatsChart" style="height: 300px;"></div>
+            </el-col>
+            <el-col :span="12">
+              <el-table :data="result?.trades || []" height="300" size="small">
+                <el-table-column prop="date" label="日期" width="100" />
+                <el-table-column prop="stockName" label="股票" width="80" />
+                <el-table-column prop="action" label="操作" width="60" />
+                <el-table-column prop="price" label="价格" width="80" />
+                <el-table-column prop="returnRate" label="收益率" width="80">
+                  <template #default="{ row }">
+                    <span :class="row.returnRate >= 0 ? 'positive' : 'negative'">
+                      {{ row.returnRate ? row.returnRate.toFixed(2) + '%' : '-' }}
+                    </span>
+                  </template>
+                </el-table-column>
+              </el-table>
+            </el-col>
+          </el-row>
+        </el-tab-pane>
+
+        <el-tab-pane label="风险指标" name="risk">
+          <el-row :gutter="20">
+            <el-col :span="8" v-for="metric in riskMetrics" :key="metric.label">
+              <el-card shadow="never" class="metric-card">
+                <el-statistic :title="metric.label" :value="metric.value" :precision="metric.precision" :suffix="metric.suffix" />
+                <div class="metric-desc">{{ metric.desc }}</div>
+              </el-card>
+            </el-col>
+          </el-row>
+        </el-tab-pane>
+
+        <el-tab-pane label="AI深度分析" name="ai">
+          <el-card shadow="never" v-loading="aiAnalysisLoading">
+            <div v-if="aiAnalysisResult" class="ai-deep-analysis" v-html="aiAnalysisResult"></div>
+            <el-empty v-else description="点击下方按钮生成AI分析报告" />
+            <div style="text-align: center; margin-top: 20px;">
+              <el-button type="primary" @click="generateAIAnalysis" :loading="aiAnalysisLoading">
+                {{ aiAnalysisLoading ? '分析中...' : '生成AI分析' }}
+              </el-button>
+            </div>
+          </el-card>
+        </el-tab-pane>
+      </el-tabs>
+    </el-dialog>
   </div>
 </template>
 
 <script setup>
-import { ref, computed, nextTick, onMounted } from 'vue'
+import { ref, computed, nextTick, onMounted, watch } from 'vue'
 import * as echarts from 'echarts'
-import { VideoPlay, Tools, Histogram, Aim, TrendCharts, InfoFilled, ChatDotRound } from '@element-plus/icons-vue'
+import { VideoPlay, Tools, Histogram, Aim, TrendCharts, InfoFilled, ChatDotRound, DataAnalysis } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import { backtestApi } from '@/api/backtest'
 import { adviceApi } from '@/api/advice'
 
 const loading = ref(false)
 const result = ref(null)
-const dateRange = ref(['2023-01-01', '2024-12-31'])
+const startDate = ref('2024-01-01')
+const endDate = ref('2024-12-31')
 const adviceList = ref([])
+const analysisVisible = ref(false)
+const activeTab = ref('returns')
+const aiAnalysisLoading = ref(false)
+const aiAnalysisResult = ref(null)
 let chart = null
+let returnDistChart = null
+let drawdownChart = null
+let tradeStatsChart = null
+
+const disabledDate = (time) => {
+  return time.getTime() > Date.now()
+}
 
 const form = ref({
   adviceId: null,
@@ -183,6 +272,178 @@ const form = ref({
   strategy: 'default',
   takeProfitPct: 10,
   stopLossPct: 5
+})
+
+const riskMetrics = computed(() => {
+  if (!result.value) return []
+  const test = result.value.testPeriod
+  return [
+    { label: '波动率', value: calculateVolatility(), precision: 2, suffix: '%', desc: '收益率标准差' },
+    { label: '最大回撤', value: test?.maxDrawdown || 0, precision: 2, suffix: '%', desc: '最大亏损幅度' },
+    { label: '夏普比率', value: test?.sharpeRatio || 0, precision: 2, suffix: '', desc: '风险调整后收益' },
+    { label: '盈亏比', value: calculateProfitLossRatio(), precision: 2, suffix: '', desc: '平均盈利/平均亏损' },
+    { label: '最大连续亏损', value: calculateMaxConsecutiveLoss(), precision: 0, suffix: '次', desc: '最长连亏次数' },
+    { label: '收益稳定性', value: result.value.overfitting?.stabilityScore || 0, precision: 2, suffix: '', desc: '样本内外一致性' }
+  ]
+})
+
+const calculateVolatility = () => {
+  if (!result.value?.equityCurve || result.value.equityCurve.length < 2) return 0
+  const returns = []
+  for (let i = 1; i < result.value.equityCurve.length; i++) {
+    const ret = (result.value.equityCurve[i].value - result.value.equityCurve[i-1].value) / result.value.equityCurve[i-1].value * 100
+    returns.push(ret)
+  }
+  const mean = returns.reduce((a, b) => a + b, 0) / returns.length
+  const variance = returns.reduce((a, b) => a + Math.pow(b - mean, 2), 0) / returns.length
+  return Math.sqrt(variance)
+}
+
+const calculateProfitLossRatio = () => {
+  if (!result.value?.trades) return 0
+  const profits = result.value.trades.filter(t => t.returnRate > 0).map(t => t.returnRate)
+  const losses = result.value.trades.filter(t => t.returnRate < 0).map(t => Math.abs(t.returnRate))
+  if (profits.length === 0 || losses.length === 0) return 0
+  const avgProfit = profits.reduce((a, b) => a + b, 0) / profits.length
+  const avgLoss = losses.reduce((a, b) => a + b, 0) / losses.length
+  return avgProfit / avgLoss
+}
+
+const calculateMaxConsecutiveLoss = () => {
+  if (!result.value?.trades) return 0
+  let maxLoss = 0, currentLoss = 0
+  result.value.trades.forEach(t => {
+    if (t.returnRate < 0) {
+      currentLoss++
+      maxLoss = Math.max(maxLoss, currentLoss)
+    } else {
+      currentLoss = 0
+    }
+  })
+  return maxLoss
+}
+
+const showAnalysis = async () => {
+  analysisVisible.value = true
+  aiAnalysisResult.value = null
+  await nextTick()
+  initAnalysisCharts()
+}
+
+const generateAIAnalysis = async () => {
+  if (!result.value) return
+  aiAnalysisLoading.value = true
+  try {
+    const analysisData = {
+      equityCurve: result.value.equityCurve,
+      trainPeriod: result.value.trainPeriod,
+      testPeriod: result.value.testPeriod,
+      trades: result.value.trades
+    }
+    const res = await backtestApi.analyzeBacktest(analysisData)
+    if (res.code === 200) {
+      aiAnalysisResult.value = res.data
+      ElMessage.success('AI分析完成')
+    }
+  } catch (e) {
+    ElMessage.error('AI分析失败')
+  } finally {
+    aiAnalysisLoading.value = false
+  }
+}
+
+const initAnalysisCharts = () => {
+  initReturnDistChart()
+  initDrawdownChart()
+  initTradeStatsChart()
+}
+
+const initReturnDistChart = () => {
+  const dom = document.getElementById('returnDistChart')
+  if (!dom || !result.value?.equityCurve) return
+  if (returnDistChart) returnDistChart.dispose()
+  returnDistChart = echarts.init(dom)
+
+  const returns = []
+  for (let i = 1; i < result.value.equityCurve.length; i++) {
+    const ret = (result.value.equityCurve[i].value - result.value.equityCurve[i-1].value) / result.value.equityCurve[i-1].value * 100
+    returns.push(ret)
+  }
+
+  returnDistChart.setOption({
+    title: { text: '收益率分布', left: 'center', textStyle: { color: '#fff' } },
+    tooltip: { trigger: 'axis' },
+    xAxis: { type: 'value', name: '收益率 (%)' },
+    yAxis: { type: 'value', name: '频次' },
+    series: [{
+      type: 'bar',
+      data: returns.map((r, i) => [r, 1]),
+      itemStyle: { color: '#00AFFF' }
+    }]
+  })
+}
+
+const initDrawdownChart = () => {
+  const dom = document.getElementById('drawdownChart')
+  if (!dom || !result.value?.equityCurve) return
+  if (drawdownChart) drawdownChart.dispose()
+  drawdownChart = echarts.init(dom)
+
+  const equity = result.value.equityCurve.map(p => p.value)
+  const drawdowns = []
+  let peak = equity[0]
+  equity.forEach(val => {
+    peak = Math.max(peak, val)
+    drawdowns.push((val - peak) / peak * 100)
+  })
+
+  drawdownChart.setOption({
+    title: { text: '回撤曲线', left: 'center', textStyle: { color: '#fff' } },
+    tooltip: { trigger: 'axis' },
+    xAxis: { type: 'category', data: result.value.equityCurve.map(p => p.date) },
+    yAxis: { type: 'value', name: '回撤 (%)' },
+    series: [{
+      type: 'line',
+      data: drawdowns,
+      areaStyle: { color: 'rgba(248, 81, 73, 0.3)' },
+      lineStyle: { color: '#F85149' }
+    }]
+  })
+}
+
+const initTradeStatsChart = () => {
+  const dom = document.getElementById('tradeStatsChart')
+  if (!dom || !result.value?.trades) return
+  if (tradeStatsChart) tradeStatsChart.dispose()
+  tradeStatsChart = echarts.init(dom)
+
+  const wins = result.value.trades.filter(t => t.returnRate > 0).length
+  const losses = result.value.trades.filter(t => t.returnRate < 0).length
+
+  tradeStatsChart.setOption({
+    title: { text: '交易胜负分布', left: 'center', textStyle: { color: '#fff' } },
+    tooltip: { trigger: 'item' },
+    series: [{
+      type: 'pie',
+      radius: '60%',
+      data: [
+        { value: wins, name: '盈利交易', itemStyle: { color: '#39D353' } },
+        { value: losses, name: '亏损交易', itemStyle: { color: '#F85149' } }
+      ],
+      label: { formatter: '{b}: {c} ({d}%)' }
+    }]
+  })
+}
+
+watch(activeTab, () => {
+  nextTick(() => {
+    if (activeTab.value === 'returns') {
+      initReturnDistChart()
+      initDrawdownChart()
+    } else if (activeTab.value === 'trades') {
+      initTradeStatsChart()
+    }
+  })
 })
 
 const onStrategyChange = () => {
@@ -232,10 +493,10 @@ const testStats = computed(() => {
 
 const runBacktest = async () => {
   if (!form.value.adviceId) return ElMessage.warning('请选择需要回测的投资建议')
-  
+
   loading.value = true
   try {
-    const payload = { ...form.value, startDate: dateRange.value[0], endDate: dateRange.value[1] }
+    const payload = { ...form.value, startDate: startDate.value, endDate: endDate.value }
     const res = await backtestApi.runBacktest(payload)
     if (res.code === 200) {
       result.value = res.data
@@ -254,14 +515,39 @@ const initChart = (data) => {
   chart = echarts.init(dom)
   const dates = data.map(p => p.date)
   const values = data.map(p => p.value)
-  
+
+  // 准备交易标注点
+  const buyPoints = []
+  const sellPoints = []
+  if (result.value?.trades) {
+    result.value.trades.forEach(trade => {
+      const dateIndex = dates.indexOf(trade.date)
+      if (dateIndex !== -1) {
+        const point = {
+          coord: [trade.date, values[dateIndex]],
+          value: trade.action === 'BUY' ? '买入' : '卖出',
+          itemStyle: { color: trade.action === 'BUY' ? '#39D353' : '#F85149' }
+        }
+        if (trade.action === 'BUY') {
+          buyPoints.push(point)
+        } else {
+          sellPoints.push(point)
+        }
+      }
+    })
+  }
+
+  const benchmarkValues = result.value.benchmarkCurve?.map(p => p.value) || []
+
   chart.setOption({
     grid: { left: '3%', right: '4%', bottom: '8%', top: '5%', containLabel: true },
     tooltip: { trigger: 'axis', axisPointer: { type: 'line', lineStyle: { color: '#00AFFF', width: 1 } } },
+    legend: { data: ['策略收益', '基准(持有)'], top: 10, textStyle: { color: '#fff' } },
     xAxis: { type: 'category', data: dates, axisLine: { lineStyle: { color: '#30363D' } } },
     yAxis: { type: 'value', scale: true, splitLine: { lineStyle: { color: '#30363D', type: 'dashed' } } },
     dataZoom: [{ type: 'inside' }, { type: 'slider', bottom: 10, height: 20 }],
     series: [{
+      name: '策略收益',
       type: 'line',
       data: values,
       smooth: true,
@@ -272,7 +558,20 @@ const initChart = (data) => {
           { offset: 0, color: 'rgba(0, 175, 255, 0.3)' },
           { offset: 1, color: 'transparent' }
         ])
+      },
+      markPoint: {
+        data: [...buyPoints, ...sellPoints],
+        symbol: 'pin',
+        symbolSize: 50,
+        label: { show: true, color: '#fff', fontSize: 10 }
       }
+    }, {
+      name: '基准(持有)',
+      type: 'line',
+      data: benchmarkValues,
+      smooth: true,
+      showSymbol: false,
+      lineStyle: { width: 2, color: '#666', type: 'dashed' }
     }]
   })
 }
@@ -311,6 +610,12 @@ const initChart = (data) => {
 .w-full { width: 100%; }
 .mt-2 { margin-top: 0.5rem; }
 .gap-6 { gap: 1.5rem; }
+.metric-card { background: rgba(255,255,255,0.02); margin-bottom: 1rem; }
+.metric-desc { font-size: 12px; color: var(--text-tertiary); margin-top: 8px; }
+.ai-deep-analysis { line-height: 1.8; color: var(--text-primary); }
+.ai-deep-analysis :deep(h3) { color: #00AFFF; margin: 1rem 0 0.5rem; }
+.ai-deep-analysis :deep(p) { margin: 0.5rem 0; }
+.ai-deep-analysis :deep(strong) { color: #39D353; }
 </style>
 
 <script>

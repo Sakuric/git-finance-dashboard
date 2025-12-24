@@ -35,4 +35,14 @@ public class BacktestController {
             return Result.error(500, "回测失败: " + e.getMessage());
         }
     }
+
+    @PostMapping("/analyze")
+    public Result<String> analyzeBacktest(@RequestBody BacktestResponseDTO data) {
+        try {
+            String analysis = advancedBacktestService.generateDeepAnalysis(data);
+            return Result.success(analysis);
+        } catch (Exception e) {
+            return Result.error(500, "AI分析失败: " + e.getMessage());
+        }
+    }
 }
