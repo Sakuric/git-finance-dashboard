@@ -87,13 +87,39 @@ public class EastMoneyApiService {
     }
 
     private String convertToSecid(String code) {
-        if (code.startsWith("sh") || code.startsWith("sz")) {
-            code = code.substring(2);
+        if (code.startsWith("sh")) {
+            return "1." + code.substring(2);
         }
-        if (code.startsWith("6")) {
+        if (code.startsWith("sz")) {
+            return "0." + code.substring(2);
+        }
+        if (code.startsWith("6") || code.equals("000001") || code.equals("000016") || code.equals("000300")) {
             return "1." + code;
         }
         return "0." + code;
+    }
+
+    public String fetchIndexTimeline(String indexCode) {
+        String secid = convertToSecid(indexCode);
+        String url = String.format(
+            "https://push2his.eastmoney.com/api/qt/stock/kline/get?secid=%s&fields1=f1,f2,f3,f4,f5,f6&fields2=f51,f52,f53,f54,f55,f56,f57,f58,f59,f60,f61&klt=1&fqt=0&end=20500101&lmt=240",
+            secid
+        );
+
+        Request request = new Request.Builder()
+            .url(url)
+            .addHeader("User-Agent", "Mozilla/5.0")
+            .addHeader("Referer", "https://quote.eastmoney.com/")
+            .build();
+
+        try (Response response = okHttpClient.newCall(request).execute()) {
+            if (response.isSuccessful() && response.body() != null) {
+                return response.body().string();
+            }
+        } catch (Exception e) {
+            log.error("获取分时数据失败: {}", indexCode, e);
+        }
+        return null;
     }
 
     public String fetchMarketOverview() {

@@ -40,6 +40,12 @@ public class MarketIndexController {
         return Result.success(klineData);
     }
 
+    @GetMapping("/indices/{indexCode}/timeline")
+    public Result<Map<String, Object>> getIndexTimeline(@PathVariable String indexCode) {
+        Map<String, Object> timeline = marketIndexService.getIndexTimeline(indexCode);
+        return Result.success(timeline);
+    }
+
     @GetMapping("/overview")
     public Result<Map<String, Object>> getMarketOverview() {
         Map<String, Object> overview = marketIndexService.getMarketOverview();

@@ -14,6 +14,27 @@
     </header>
 
     <div class="content-grid">
+      <!-- 用户偏好显示板块 -->
+      <div class="card preference-display-card" v-if="preferences.risk" style="grid-column: 1 / -1;">
+        <div class="card-header">
+          <h3><i class="fas fa-user-cog"></i> 当前投资偏好</h3>
+        </div>
+        <div class="preference-display">
+          <div class="pref-item">
+            <div class="pref-label"><i class="fas fa-shield-alt"></i> 风险承受能力</div>
+            <div class="pref-value">{{ getRiskLevelLabel(preferences.risk) }}</div>
+          </div>
+          <div class="pref-item">
+            <div class="pref-label"><i class="fas fa-clock"></i> 投资期限</div>
+            <div class="pref-value">{{ preferences.term }}</div>
+          </div>
+          <div class="pref-item">
+            <div class="pref-label"><i class="fas fa-industry"></i> 关注行业</div>
+            <div class="pref-value">{{ preferences.industries.join('、') }}</div>
+          </div>
+        </div>
+      </div>
+
       <!-- 风险说明弹窗 -->
       <div class="modal-overlay" v-if="showRiskModal" @click="showRiskModal = false">
         <div class="modal-content" @click.stop>
@@ -34,6 +55,11 @@
       <div class="card" style="grid-column: 1 / -1;">
         <div class="card-header">
           <h3>投资偏好设置</h3>
+          <div v-if="preferences.risk" class="preference-summary">
+            <span class="summary-item"><i class="fas fa-shield-alt"></i> {{ getRiskLevelLabel(preferences.risk) }}</span>
+            <span class="summary-item"><i class="fas fa-clock"></i> {{ preferences.term }}</span>
+            <span class="summary-item"><i class="fas fa-industry"></i> {{ preferences.industries.length }}个行业</span>
+          </div>
         </div>
         <div class="preference-settings">
           <div class="preference-group" :class="{ 'has-error': errors.risk }">
@@ -173,6 +199,7 @@ import { useRouter } from 'vue-router'
 import * as echarts from 'echarts'
 import { savePreference, getPreference } from '@/api/preference'
 import { adviceApi } from '@/api/advice'
+import { getPortfolioBalance } from '@/api/portfolio'
 import { useAuthStore } from '@/stores/auth'
 
 export default {
@@ -302,12 +329,42 @@ export default {
       return advices.value.filter(advice => advice.type === activeFilter.value)
     })
 
-    const initPortfolioChart = () => {
+    const initPortfolioChart = async () => {
       const chartDom = document.getElementById('portfolioAnalysisChart')
       if (!chartDom) return
       if (portfolioChart.value) portfolioChart.value.dispose()
       portfolioChart.value = echarts.init(chartDom)
-      
+
+      const uid = ensureUserId()
+      let currentData = [70, 70, 70, 70, 70]
+      let suggestedData = [80, 80, 80, 80, 80]
+
+      if (uid) {
+        try {
+          const res = await getPortfolioBalance(uid)
+          if (res.data) {
+            const current = res.data.current
+            const suggested = res.data.suggested
+            currentData = [
+              current.growth || 70,
+              current.value || 70,
+              current.stability || 70,
+              current.profitability || 70,
+              current.liquidity || 70
+            ]
+            suggestedData = [
+              suggested.growth || 80,
+              suggested.value || 80,
+              suggested.stability || 80,
+              suggested.profitability || 80,
+              suggested.liquidity || 80
+            ]
+          }
+        } catch (e) {
+          console.error('加载配置均衡度数据失败', e)
+        }
+      }
+
       const option = {
         backgroundColor: 'transparent',
         tooltip: { trigger: 'axis', backgroundColor: 'rgba(22, 27, 34, 0.9)', borderColor: '#30363D', textStyle: { color: '#C9D1D9' } },
@@ -324,8 +381,8 @@ export default {
           axisName: { color: '#8B949E' }
         },
         series: [
-          { name: '当前组合', type: 'radar', data: [{ value: [85, 70, 90, 75, 80], name: '当前组合', areaStyle: { color: 'rgba(0, 175, 255, 0.4)' }, lineStyle: { color: '#00AFFF', width: 2 } }] },
-          { name: '建议组合', type: 'radar', data: [{ value: [90, 80, 85, 85, 90], name: '建议组合', areaStyle: { color: 'rgba(0, 184, 148, 0.4)' }, lineStyle: { color: '#00B894', width: 2 } }] }
+          { name: '当前组合', type: 'radar', data: [{ value: currentData, name: '当前组合', areaStyle: { color: 'rgba(0, 175, 255, 0.4)' }, lineStyle: { color: '#00AFFF', width: 2 } }] },
+          { name: '建议组合', type: 'radar', data: [{ value: suggestedData, name: '建议组合', areaStyle: { color: 'rgba(0, 184, 148, 0.4)' }, lineStyle: { color: '#00B894', width: 2 } }] }
         ]
       }
       portfolioChart.value.setOption(option)
@@ -355,6 +412,7 @@ export default {
           preferredIndustry: preferences.value.industries.join(',')
         })
         alert('偏好设置保存成功')
+        await loadPreferences()
       } catch (e) {
         alert('保存失败: ' + (e?.response?.data?.message || e.message || '网络错误'))
       } finally {
@@ -367,14 +425,22 @@ export default {
       if (!uid) return
       try {
         const res = await getPreference(uid)
-        if (res.data) {
-          preferences.value.risk = res.data.riskToleranceLevel || null
-          preferences.value.term = res.data.investmentHorizonPreset || ''
-          preferences.value.industries = res.data.preferredIndustry ? res.data.preferredIndustry.split(',') : []
+        console.log('加载用户偏好:', res)
+        const data = res.data || res
+        if (data && data.riskToleranceLevel) {
+          preferences.value.risk = data.riskToleranceLevel
+          preferences.value.term = data.investmentHorizonPreset || ''
+          preferences.value.industries = data.preferredIndustry ? data.preferredIndustry.split(',') : []
+          console.log('偏好数据已加载:', preferences.value)
         }
       } catch (e) {
         console.error('加载偏好失败', e)
       }
+    }
+
+    const getRiskLevelLabel = (risk) => {
+      const level = riskLevels.find(l => l.value === risk)
+      return level ? level.label : '未设置'
     }
 
     onMounted(() => {
@@ -385,7 +451,7 @@ export default {
 
     return {
       showRiskModal, preferences, errors, saving, loading, riskLevels, investmentTerms,
-      industryCategories, filters, activeFilter, filteredAdvices, savePreferences, generateAdvice
+      industryCategories, filters, activeFilter, filteredAdvices, savePreferences, generateAdvice, getRiskLevelLabel
     }
   }
 }
@@ -422,6 +488,16 @@ export default {
 }
 .card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; }
 .card-header h3 { margin: 0; color: var(--text-primary); font-size: 1.1rem; }
+
+.preference-summary { display: flex; gap: 1rem; align-items: center; }
+.summary-item { display: flex; align-items: center; gap: 0.4rem; padding: 0.4rem 0.8rem; background: rgba(0, 166, 255, 0.1); border: 1px solid rgba(0, 166, 255, 0.3); border-radius: 6px; color: var(--primary-accent); font-size: 0.85rem; }
+.summary-item i { font-size: 0.9rem; }
+
+.preference-display { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 1rem; }
+.pref-item { padding: 1rem; background: rgba(0, 166, 255, 0.05); border: 1px solid rgba(0, 166, 255, 0.2); border-radius: 8px; }
+.pref-label { display: flex; align-items: center; gap: 0.5rem; color: var(--text-secondary); font-size: 0.85rem; margin-bottom: 0.5rem; }
+.pref-label i { color: var(--primary-accent); }
+.pref-value { color: var(--text-primary); font-size: 1rem; font-weight: 500; }
 
 .preference-settings { display: flex; flex-direction: column; gap: 1.5rem; }
 .preference-group h4 { color: var(--text-primary); margin-bottom: 1rem; font-size: 0.95rem; display: flex; align-items: center; gap: 0.5rem; }

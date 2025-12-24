@@ -68,6 +68,8 @@ public class MarketIndexServiceImpl implements MarketIndexService {
             String json = eastMoneyApiService.fetchIndexKLine(indexCode, days);
             if (json == null) return Collections.emptyList();
 
+            log.info("东方财富K线原始数据: {}", json);
+
             JsonNode root = objectMapper.readTree(json);
             JsonNode klines = root.path("data").path("klines");
             if (!klines.isArray()) return Collections.emptyList();
@@ -75,6 +77,7 @@ public class MarketIndexServiceImpl implements MarketIndexService {
             List<KLineDTO> result = new ArrayList<>();
             for (JsonNode kline : klines) {
                 String[] parts = kline.asText().split(",");
+                log.info("解析K线数据: {}", kline.asText());
                 if (parts.length < 6) continue;
 
                 KLineDTO dto = new KLineDTO();
@@ -90,6 +93,41 @@ public class MarketIndexServiceImpl implements MarketIndexService {
         } catch (Exception e) {
             log.error("解析东方财富K线失败: {}", indexCode, e);
             return Collections.emptyList();
+        }
+    }
+
+    @Override
+    public Map<String, Object> getIndexTimeline(String indexCode) {
+        try {
+            String json = eastMoneyApiService.fetchIndexTimeline(indexCode);
+            if (json == null) return Collections.emptyMap();
+
+            JsonNode root = objectMapper.readTree(json);
+            JsonNode dataNode = root.path("data");
+            JsonNode klines = dataNode.path("klines");
+            if (!klines.isArray()) return Collections.emptyMap();
+
+            double prePrice = dataNode.path("preKPrice").asDouble();
+
+            List<Map<String, Object>> points = new ArrayList<>();
+            for (JsonNode kline : klines) {
+                String[] parts = kline.asText().split(",");
+                if (parts.length < 6) continue;
+
+                Map<String, Object> point = new HashMap<>();
+                point.put("time", parts[0].length() > 10 ? parts[0].substring(11) : parts[0]);
+                point.put("price", new BigDecimal(parts[2]));
+                point.put("volume", Long.parseLong(parts[5]));
+                points.add(point);
+            }
+
+            Map<String, Object> result = new HashMap<>();
+            result.put("prePrice", prePrice);
+            result.put("points", points);
+            return result;
+        } catch (Exception e) {
+            log.error("解析分时数据失败: {}", indexCode, e);
+            return Collections.emptyMap();
         }
     }
 

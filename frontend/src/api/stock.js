@@ -84,6 +84,13 @@ export function getIndexKLine(indexCode, days = 250) {
   })
 }
 
+export function getIndexTimeline(indexCode) {
+  return request({
+    url: `/market/indices/${indexCode}/timeline`,
+    method: 'get'
+  })
+}
+
 export function searchStock(keyword) {
   return request({
     url: '/stocks/query',

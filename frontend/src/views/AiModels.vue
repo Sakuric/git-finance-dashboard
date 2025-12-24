@@ -146,12 +146,16 @@
                     </span>
                   </div>
                   <div class="model-actions">
-                    <button class="icon-btn success" @click.stop="setDefaultModel(model)" title="设为默认" :class="{ active: model.dbData?.isDefault === 1 }">
-                      <i :class="model.dbData?.isDefault === 1 ? 'fas fa-star' : 'far fa-star'"></i>
-                    </button>
-                    <button class="icon-btn danger" @click.stop="removeModel(model)" title="删除">
-                      <i class="fas fa-trash"></i>
-                    </button>
+                    <el-rate
+                      :model-value="model.dbData?.isDefault || 0"
+                      :max="1"
+                      @change="(val) => val && setDefaultModel(model)"
+                      :colors="['#FFA940']"
+                      void-color="var(--border-color)"
+                      size="large"
+                      @click.stop
+                    />
+                    <el-button link type="danger" @click.stop="removeModel(model)" :icon="Delete" />
                   </div>
                 </div>
               </div>
@@ -207,6 +211,7 @@
 
 <script>
 import { ref, reactive, computed, onMounted } from 'vue'
+import { Delete } from '@element-plus/icons-vue'
 import { getAiPlatforms, saveAiPlatform, updateAiPlatform, deleteAiPlatform } from '@/api/aiPlatform'
 import { getAiModels, addAiModel, updateAiModel, deleteAiModel } from '@/api/aiModel'
 import { useAuthStore } from '@/stores/auth'
@@ -447,7 +452,7 @@ export default {
       capabilities, newModel, modelGroups, totalModelsCount, filteredModelGroups, toggleGroup, testApiKey,
       configureModel, removeModel, addModel, platforms, selectedPlatform, selectPlatform, selectedModel,
       selectModel, clearSelectedModel, customPlatformName, saveCustomPlatform, savePlatformConfig, removePlatform, apiErrors,
-      setDefaultModel
+      setDefaultModel, Delete
     }
   }
 }
@@ -509,8 +514,14 @@ input:checked + .slider:before { transform: translateX(24px); }
 .icon-btn { background: none; border: none; color: var(--text-secondary); cursor: pointer; padding: 0.5rem; border-radius: 6px; transition: all 0.2s; }
 .icon-btn:hover { color: var(--text-primary); background: rgba(255, 255, 255, 0.1); }
 .icon-btn.danger:hover { color: var(--color-negative); background: rgba(255, 77, 79, 0.1); }
-.icon-btn.success { color: var(--text-tertiary); }
-.icon-btn.success:hover, .icon-btn.success.active { color: #FFA940; background: rgba(255, 169, 64, 0.1); }
+.icon-btn.success { color: var(--text-tertiary); font-size: 1.1rem; transition: all 0.3s ease; }
+.icon-btn.success:hover { color: #FFA940; background: rgba(255, 169, 64, 0.1); transform: scale(1.1); }
+.icon-btn.success.active { color: #FFA940; background: rgba(255, 169, 64, 0.2); transform: scale(1.15); animation: pulse 0.5s ease; }
+
+@keyframes pulse {
+  0%, 100% { transform: scale(1.15); }
+  50% { transform: scale(1.25); }
+}
 .icon-btn-mini { background: none; border: none; padding: 0.15rem; cursor: pointer; color: var(--text-tertiary); margin-left: auto; border-radius: 3px; font-size: 0.7rem; opacity: 0; transition: all 0.2s ease; }
 .platform-item:hover .icon-btn-mini { opacity: 1; }
 .icon-btn-mini.danger:hover { color: var(--color-negative); background: rgba(255, 77, 79, 0.1); }
@@ -540,7 +551,7 @@ input:checked + .slider:before { transform: translateX(24px); }
 .model-icon { color: var(--primary-accent); }
 .model-name { color: var(--text-primary); font-size: 0.9rem; }
 .model-badges { display: flex; gap: 0.4rem; margin-right: 1rem; }
-.model-actions { display: flex; gap: 0.25rem; }
+.model-actions { display: flex; gap: 0.5rem; align-items: center; }
 
 .badge { padding: 0.2rem 0.5rem; border-radius: 4px; font-size: 0.7rem; font-weight: 500; }
 .badge.vision { background: rgba(0, 192, 135, 0.15); color: #00C087; }

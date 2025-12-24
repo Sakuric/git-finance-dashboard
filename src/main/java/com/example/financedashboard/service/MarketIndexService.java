@@ -10,5 +10,6 @@ public interface MarketIndexService {
     List<SinaRealtimeDTO> getMainIndices();
     SinaRealtimeDTO getIndexByCode(String indexCode);
     List<KLineDTO> getIndexKLine(String indexCode, Integer days);
+    Map<String, Object> getIndexTimeline(String indexCode);
     Map<String, Object> getMarketOverview();
 }
