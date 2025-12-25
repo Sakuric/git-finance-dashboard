@@ -97,9 +97,8 @@ logs/
 *.sql
 
 #docker
-*.Dockerfile
-*.dockerignore
-*.env
-*.log
-*.yml
-*.conf
+Dockerfile
+.dockerignore
+docker-compose.yml
+nginx.conf
+.env.example
