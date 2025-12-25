@@ -77,14 +77,21 @@
                 <el-icon><InfoFilled /></el-icon>
                 <span>止盈: +10% | 止损: -5% | 仓位: 10%</span>
               </div>
+              <div class="strategy-tip" v-if="form.strategy === 'custom'">
+                <el-icon><InfoFilled /></el-icon>
+                <span>止盈: +{{ form.takeProfitPct }}% | 止损: -{{ form.stopLossPct }}% | 仓位: {{ form.positionSizePct }}%</span>
+              </div>
             </el-form-item>
 
             <template v-if="form.strategy === 'custom'">
               <el-form-item label="止盈阈值 (%)">
-                <el-input-number v-model="form.takeProfitPct" :min="5" :max="50" :step="5" class="w-full" controls-position="right" />
+                <el-input-number v-model="form.takeProfitPct" :min="1" :max="100" :step="5" class="w-full" controls-position="right" />
               </el-form-item>
               <el-form-item label="止损阈值 (%)">
-                <el-input-number v-model="form.stopLossPct" :min="3" :max="20" :step="1" class="w-full" controls-position="right" />
+                <el-input-number v-model="form.stopLossPct" :min="1" :max="100" :step="1" class="w-full" controls-position="right" />
+              </el-form-item>
+              <el-form-item label="单笔仓位 (%)">
+                <el-input-number v-model="form.positionSizePct" :min="1" :max="100" :step="5" class="w-full" controls-position="right" />
               </el-form-item>
             </template>
 
@@ -271,7 +278,8 @@ const form = ref({
   trainRatio: 0.7,
   strategy: 'default',
   takeProfitPct: 10,
-  stopLossPct: 5
+  stopLossPct: 5,
+  positionSizePct: 10
 })
 
 const riskMetrics = computed(() => {
@@ -450,6 +458,7 @@ const onStrategyChange = () => {
   if (form.value.strategy === 'default') {
     form.value.takeProfitPct = 10
     form.value.stopLossPct = 5
+    form.value.positionSizePct = 10
   }
 }
 
@@ -539,16 +548,52 @@ const initChart = (data) => {
 
   const benchmarkValues = result.value.benchmarkCurve?.map(p => p.value) || []
 
+  // 计算股票价格数据（基准曲线代表股票价格走势）
+  const stockPrices = benchmarkValues.length > 0 ? benchmarkValues.map((val, idx) => {
+    const initialPrice = benchmarkValues[0]
+    return val / initialPrice * 100 // 归一化为初始价格的百分比
+  }) : []
+
   chart.setOption({
-    grid: { left: '3%', right: '4%', bottom: '8%', top: '5%', containLabel: true },
-    tooltip: { trigger: 'axis', axisPointer: { type: 'line', lineStyle: { color: '#00AFFF', width: 1 } } },
-    legend: { data: ['策略收益', '基准(持有)'], top: 10, textStyle: { color: '#fff' } },
+    grid: { left: '3%', right: '8%', bottom: '8%', top: '5%', containLabel: true },
+    tooltip: {
+      trigger: 'axis',
+      axisPointer: { type: 'line', lineStyle: { color: '#00AFFF', width: 1 } },
+      formatter: function(params) {
+        let result = params[0].axisValue + '<br/>'
+        params.forEach(item => {
+          if (item.seriesName === '股票价格') {
+            result += item.marker + item.seriesName + ': ' + item.value.toFixed(2) + '<br/>'
+          } else {
+            result += item.marker + item.seriesName + ': ' + item.value.toLocaleString('zh-CN', {minimumFractionDigits: 2, maximumFractionDigits: 2}) + '<br/>'
+          }
+        })
+        return result
+      }
+    },
+    legend: { data: ['策略收益', '基准(持有)', '股票价格'], top: 10, textStyle: { color: '#fff' } },
     xAxis: { type: 'category', data: dates, axisLine: { lineStyle: { color: '#30363D' } } },
-    yAxis: { type: 'value', scale: true, splitLine: { lineStyle: { color: '#30363D', type: 'dashed' } } },
+    yAxis: [
+      {
+        type: 'value',
+        name: '净值 (CNY)',
+        scale: true,
+        splitLine: { lineStyle: { color: '#30363D', type: 'dashed' } },
+        axisLabel: { formatter: '{value}' }
+      },
+      {
+        type: 'value',
+        name: '股票价格指数',
+        scale: true,
+        splitLine: { show: false },
+        axisLabel: { formatter: '{value}' }
+      }
+    ],
     dataZoom: [{ type: 'inside' }, { type: 'slider', bottom: 10, height: 20 }],
     series: [{
       name: '策略收益',
       type: 'line',
+      yAxisIndex: 0,
       data: values,
       smooth: true,
       showSymbol: false,
@@ -568,10 +613,19 @@ const initChart = (data) => {
     }, {
       name: '基准(持有)',
       type: 'line',
+      yAxisIndex: 0,
       data: benchmarkValues,
       smooth: true,
       showSymbol: false,
       lineStyle: { width: 2, color: '#666', type: 'dashed' }
+    }, {
+      name: '股票价格',
+      type: 'line',
+      yAxisIndex: 1,
+      data: stockPrices,
+      smooth: true,
+      showSymbol: false,
+      lineStyle: { width: 2, color: '#FFA500', type: 'dotted' }
     }]
   })
 }

@@ -49,11 +49,11 @@ public class AdvancedBacktestService {
         List<BacktestResponseDTO.TradeDetail> allTrades = new ArrayList<>();
 
         BacktestResponseDTO.PeriodResult trainResult = runPeriodBacktest(
-            advices, request.getStartDate(), splitDate, request.getInitialCapital(), "训练期", allTrades
+            advices, request.getStartDate(), splitDate, request.getInitialCapital(), "训练期", allTrades, request
         );
 
         BacktestResponseDTO.PeriodResult testResult = runPeriodBacktest(
-            advices, splitDate.plusDays(1), request.getEndDate(), request.getInitialCapital(), "测试期", allTrades
+            advices, splitDate.plusDays(1), request.getEndDate(), request.getInitialCapital(), "测试期", allTrades, request
         );
 
         BacktestResponseDTO.OverfittingDetection overfitting = detectOverfitting(trainResult, testResult);
@@ -85,7 +85,8 @@ public class AdvancedBacktestService {
 
     private BacktestResponseDTO.PeriodResult runPeriodBacktest(
         List<StructuredAdvice> advices, LocalDate startDate, LocalDate endDate,
-        BigDecimal initialCapital, String periodName, List<BacktestResponseDTO.TradeDetail> trades
+        BigDecimal initialCapital, String periodName, List<BacktestResponseDTO.TradeDetail> trades,
+        BacktestRequestDTO request
     ) {
         log.info("开始{}回测: {} 到 {}, 初始资金: {}", periodName, startDate, endDate, initialCapital);
 
@@ -96,6 +97,18 @@ public class AdvancedBacktestService {
         int winCount = 0, lossCount = 0;
 
         for (LocalDate date = startDate; !date.isAfter(endDate); date = date.plusDays(1)) {
+            boolean hasValidData = false;
+            for (StructuredAdvice advice : advices) {
+                List<StockHistory> history = stockHistoryMapper.findByStockCodeAndDateRange(
+                    advice.getStockCode(), date, date
+                );
+                if (!history.isEmpty()) {
+                    hasValidData = true;
+                    break;
+                }
+            }
+            if (!hasValidData) continue;
+
             for (StructuredAdvice advice : advices) {
                 List<StockHistory> history = stockHistoryMapper.findByStockCodeAndDateRange(
                     advice.getStockCode(), date, date
@@ -112,25 +125,14 @@ public class AdvancedBacktestService {
                     boolean shouldSell = false;
                     String sellReason = "";
 
-                    // 策略1: AI建议止盈价
-                    if (advice.getTakeProfitPrice() != null && currentPrice.compareTo(advice.getTakeProfitPrice()) >= 0) {
+                    // 优先使用用户自定义的止盈止损阈值
+                    if (changeRate.compareTo(request.getTakeProfitPct()) >= 0) {
                         shouldSell = true;
-                        sellReason = "达到AI止盈价";
+                        sellReason = "上涨超" + request.getTakeProfitPct() + "%止盈";
                     }
-                    // 策略2: AI建议止损价
-                    else if (advice.getStopLossPrice() != null && currentPrice.compareTo(advice.getStopLossPrice()) <= 0) {
+                    else if (changeRate.compareTo(request.getStopLossPct().negate()) <= 0) {
                         shouldSell = true;
-                        sellReason = "达到AI止损价";
-                    }
-                    // 策略3: 下跌阈值止损
-                    else if (changeRate.compareTo(new BigDecimal("-5")) <= 0) {
-                        shouldSell = true;
-                        sellReason = "下跌超5%止损";
-                    }
-                    // 策略4: 上涨阈值止盈
-                    else if (changeRate.compareTo(new BigDecimal("10")) >= 0) {
-                        shouldSell = true;
-                        sellReason = "上涨超10%止盈";
+                        sellReason = "下跌超" + request.getStopLossPct() + "%止损";
                     }
 
                     if (shouldSell) {
@@ -154,12 +156,12 @@ public class AdvancedBacktestService {
                         positions.remove(advice.getStockCode());
                     }
                 } else if (!initialBuyDone.contains(advice.getStockCode())) {
-                    // 只在首次遇到时买入
+                    // 只在首次遇到有效数据时买入
                     boolean shouldBuy = "BUY".equals(advice.getSuggestedAction());
                     String buyReason = "初始建仓";
 
                     if (shouldBuy && cash.compareTo(BigDecimal.ZERO) > 0) {
-                        BigDecimal positionSize = cash.multiply(new BigDecimal("0.10"));
+                        BigDecimal positionSize = cash.multiply(request.getPositionSizePct().divide(new BigDecimal("100"), 4, RoundingMode.HALF_UP));
                         int shares = positionSize.divide(currentPrice, 0, RoundingMode.DOWN).intValue();
 
                         if (shares > 0) {
@@ -186,7 +188,11 @@ public class AdvancedBacktestService {
 
             BigDecimal totalValue = cash;
             for (Map.Entry<String, Position> entry : positions.entrySet()) {
-                BigDecimal currentPrice = getCurrentPrice(entry.getKey(), date);
+                List<StockHistory> posHistory = stockHistoryMapper.findByStockCodeAndDateRange(
+                    entry.getKey(), date, date
+                );
+                BigDecimal currentPrice = posHistory.isEmpty() ?
+                    getCurrentPrice(entry.getKey(), date) : posHistory.get(0).getClosePrice();
                 totalValue = totalValue.add(currentPrice.multiply(new BigDecimal(entry.getValue().shares)));
             }
             dailyValues.add(totalValue);
@@ -289,19 +295,63 @@ public class AdvancedBacktestService {
         List<BacktestResponseDTO.EquityPoint> curve = new ArrayList<>();
         if (advices.isEmpty()) return curve;
 
-        StructuredAdvice firstAdvice = advices.get(0);
-        BigDecimal startPrice = getCurrentPrice(firstAdvice.getStockCode(), startDate);
-        if (startPrice.compareTo(BigDecimal.ZERO) == 0) return curve;
+        // 过滤出BUY建议的股票
+        List<StructuredAdvice> buyAdvices = advices.stream()
+            .filter(a -> "BUY".equals(a.getSuggestedAction()))
+            .collect(java.util.stream.Collectors.toList());
 
-        int shares = initialCapital.divide(startPrice, 0, RoundingMode.DOWN).intValue();
+        if (buyAdvices.isEmpty()) return curve;
+
+        // 找到第一个有效交易日并买入所有股票
+        Map<String, Integer> holdings = new HashMap<>();
+        BigDecimal remainingCash = initialCapital;
+        LocalDate firstTradeDate = null;
 
         for (LocalDate date = startDate; !date.isAfter(endDate); date = date.plusDays(1)) {
-            BigDecimal currentPrice = getCurrentPrice(firstAdvice.getStockCode(), date);
-            BigDecimal value = currentPrice.multiply(new BigDecimal(shares));
+            boolean hasValidData = false;
+            for (StructuredAdvice advice : buyAdvices) {
+                BigDecimal price = getCurrentPrice(advice.getStockCode(), date);
+                if (price.compareTo(BigDecimal.ZERO) > 0) {
+                    hasValidData = true;
+                    break;
+                }
+            }
+
+            if (hasValidData) {
+                firstTradeDate = date;
+                // 平均分配资金买入所有股票
+                BigDecimal perStockCapital = initialCapital.divide(new BigDecimal(buyAdvices.size()), 0, RoundingMode.DOWN);
+
+                for (StructuredAdvice advice : buyAdvices) {
+                    BigDecimal price = getCurrentPrice(advice.getStockCode(), date);
+                    if (price.compareTo(BigDecimal.ZERO) > 0) {
+                        int shares = perStockCapital.divide(price, 0, RoundingMode.DOWN).intValue();
+                        if (shares > 0) {
+                            holdings.put(advice.getStockCode(), shares);
+                            remainingCash = remainingCash.subtract(price.multiply(new BigDecimal(shares)));
+                        }
+                    }
+                }
+                break;
+            }
+        }
+
+        if (firstTradeDate == null || holdings.isEmpty()) return curve;
+
+        // 生成每日净值曲线
+        for (LocalDate date = firstTradeDate; !date.isAfter(endDate); date = date.plusDays(1)) {
+            BigDecimal totalValue = remainingCash;
+
+            for (Map.Entry<String, Integer> entry : holdings.entrySet()) {
+                BigDecimal currentPrice = getCurrentPrice(entry.getKey(), date);
+                if (currentPrice.compareTo(BigDecimal.ZERO) > 0) {
+                    totalValue = totalValue.add(currentPrice.multiply(new BigDecimal(entry.getValue())));
+                }
+            }
 
             BacktestResponseDTO.EquityPoint point = new BacktestResponseDTO.EquityPoint();
             point.setDate(date.toString());
-            point.setValue(value);
+            point.setValue(totalValue);
             curve.add(point);
         }
 
@@ -309,15 +359,17 @@ public class AdvancedBacktestService {
     }
 
     private BigDecimal getCurrentPrice(String stockCode, LocalDate date) {
-        // 先尝试从数据库获取
-        for (int i = 0; i < 10; i++) {
+        // 向前查找最近的有效价格（最多30天）
+        for (int i = 0; i < 30; i++) {
             List<StockHistory> history = stockHistoryMapper.findByStockCodeAndDateRange(
                 stockCode, date.minusDays(i), date.minusDays(i)
             );
-            if (!history.isEmpty()) return history.get(0).getClosePrice();
+            if (!history.isEmpty()) {
+                return history.get(0).getClosePrice();
+            }
         }
-
-        return BigDecimal.ONE;
+        // 如果30天内都没有数据，返回0表示无效
+        return BigDecimal.ZERO;
     }
 
     private BigDecimal calculateMaxDrawdown(List<BigDecimal> values) {
