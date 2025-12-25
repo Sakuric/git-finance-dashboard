@@ -92,3 +92,6 @@ logs/
 
 #pictures
 *.png
+
+# Database files
+*.sql
