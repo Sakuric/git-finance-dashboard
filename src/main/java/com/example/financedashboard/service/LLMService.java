@@ -84,15 +84,21 @@ public class LLMService {
             }
 
             String responseBody = response.body().string();
-            log.info("LLM响应: {}", responseBody);
-
             LLMResponse llmResponse = JSON.parseObject(responseBody, LLMResponse.class);
 
             if (llmResponse.getChoices() == null || llmResponse.getChoices().isEmpty()) {
-                throw new RuntimeException("LLM返回格式异常: " + responseBody);
+                throw new RuntimeException("LLM返回格式异常");
             }
 
-            return llmResponse.getChoices().get(0).getMessage().getContent();
+            String content = llmResponse.getChoices().get(0).getMessage().getContent();
+
+            // 验证content是否为有效JSON
+            try {
+                JSON.parseObject(content);
+                return content;
+            } catch (Exception e) {
+                throw new RuntimeException("LLM返回的content不是有效JSON");
+            }
         } catch (Exception e) {
             log.error("调用大模型失败", e);
             throw new RuntimeException("调用大模型失败: " + e.getMessage());
