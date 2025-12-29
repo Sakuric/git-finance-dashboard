@@ -17,7 +17,8 @@
       "Bash(dir:*)",
       "Bash(tasklist:*)",
       "Bash(mvn clean package:*)",
-      "Bash(npm run build:*)"
+      "Bash(npm run build:*)",
+      "Bash(test:*)"
     ]
   }
 }
